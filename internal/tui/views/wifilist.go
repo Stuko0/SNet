@@ -36,10 +36,10 @@ type WifiListModel struct {
 	toastErr error
 	err      error
 
-	selectedIndex int
+	// selectedIndex int
 	showPassword  bool
-	width         int
-	height        int
+	// width         int
+	// height        int
 }
 
 func NewWifiList() WifiListModel {
