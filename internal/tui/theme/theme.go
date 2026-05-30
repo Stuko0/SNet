@@ -126,6 +126,10 @@ var (
 	ToastStyle = lipgloss.NewStyle().
 		Padding(0, 2).
 		MarginTop(1)
+
+	TableStyle = lipgloss.NewStyle().
+		MarginLeft(2).
+		MarginRight(2)
 )
 
 // TabTitles son los nombres de las pestañas
