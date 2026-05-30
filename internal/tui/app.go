@@ -157,7 +157,7 @@ func (m Model) View() string {
 	content = lipgloss.NewStyle().Width(contentWidth).Render(content)
 
 	// Footer
-	footer := renderFooter(m.quitting, m.showHelp)
+	footer := renderFooter(m.quitting, m.showHelp, m.activeTab)
 
 	// Help overlay
 	if m.showHelp {
@@ -208,7 +208,7 @@ func renderTabs(active int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
 }
 
-func renderFooter(quitting bool, showHelp bool) string {
+func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 	if showHelp {
 		return theme.FooterStyle.Width(100).
 			Render("Presiona ? o Esc para cerrar la ayuda")
@@ -217,13 +217,32 @@ func renderFooter(quitting bool, showHelp bool) string {
 		return ""
 	}
 
-	keys := []struct {
-		key, desc string
-	}{
-		{"Tab", "Navegar"},
-		{"r", "Refresh"},
-		{"?", "Ayuda"},
-		{"Ctrl+q", "Salir"},
+	// Footer keys según vista activa
+	var keys []struct{ key, desc string }
+
+	switch activeTab {
+	case 0: // Dashboard
+		keys = []struct{ key, desc string }{
+			{"Tab", "Navegar"},
+			{"r", "Refresh"},
+			{"?", "Ayuda"},
+			{"Ctrl+q", "Salir"},
+		}
+	case 1: // Wi-Fi
+		keys = []struct{ key, desc string }{
+			{"↑/↓", "Navegar"},
+			{"Enter", "Conectar"},
+			{"r", "Buscar"},
+			{"Tab", "Siguiente"},
+			{"?", "Ayuda"},
+		}
+	default:
+		keys = []struct{ key, desc string }{
+			{"Tab", "Navegar"},
+			{"r", "Refresh"},
+			{"?", "Ayuda"},
+			{"Ctrl+q", "Salir"},
+		}
 	}
 
 	var parts []string

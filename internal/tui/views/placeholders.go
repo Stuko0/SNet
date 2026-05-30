@@ -6,28 +6,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// WifiListModel placeholder — se implementa en Fase 2
-type WifiListModel struct {
-}
-
-func NewWifiList() WifiListModel {
-	return WifiListModel{}
-}
-
-func (m WifiListModel) Init() tea.Cmd { return nil }
-
-func (m WifiListModel) Update(msg tea.Msg) (WifiListModel, tea.Cmd) {
-	return m, nil
-}
-
-func (m WifiListModel) View() string {
-	return theme.CardStyle.Render(
-		theme.CardTitleStyle.Render("📶 Redes Wi-Fi") + "\n\n"+
-			"    Escaneo de redes disponible en Fase 2.\n\n"+
-			"    Presiona Tab para cambiar de vista.",
-	)
-}
-
 // SavedModel placeholder — Fase 3
 type SavedModel struct{}
 
