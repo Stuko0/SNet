@@ -1,7 +1,9 @@
 # Binaries
-snet
-snet.exe
-snet-*
+/snet
+/snet.exe
+/snet-*
+cmd/snet/snet
+cmd/snet/snet.exe
 
 # Test binaries
 *.test

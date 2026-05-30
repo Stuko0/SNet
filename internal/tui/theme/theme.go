@@ -36,7 +36,8 @@ var (
 		Padding(0, 2).
 		Foreground(ColorSubtle)
 
-	ActiveTabStyle = TabStyle.Copy().
+	ActiveTabStyle = lipgloss.NewStyle().
+    	Padding(0, 2).
 		Foreground(ColorPrimary).
 		Border(lipgloss.Border{
 			Top:         "─",

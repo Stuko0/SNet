@@ -8,7 +8,6 @@ import (
 
 // WifiListModel placeholder — se implementa en Fase 2
 type WifiListModel struct {
-	ready bool
 }
 
 func NewWifiList() WifiListModel {
