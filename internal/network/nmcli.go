@@ -323,3 +323,7 @@ func ModifyConnection(name, setting, value string) error { return DefaultClient.
 func ConnectionUp(name string) error                     { return DefaultClient.ConnectionUp(name) }
 func ConnectionDown(name string) error                   { return DefaultClient.ConnectionDown(name) }
 func AddWiFiConnection(ssid, password string) error      { return DefaultClient.AddWiFiConnection(ssid, password) }
+func HotspotStart(cfg HotspotConfig) error                  { return DefaultClient.HotspotStart(cfg) }
+func HotspotStop() error                                     { return DefaultClient.HotspotStop() }
+func HotspotStatus() (*HotspotConfig, error)                 { return DefaultClient.HotspotStatus() }
+func GetHotspotIface() string                                { return DefaultClient.GetHotspotIface() }

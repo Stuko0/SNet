@@ -22,20 +22,3 @@ func (m VPNListModel) View() string {
 			"    Gestión de VPN disponible en Fase 5.",
 	)
 }
-
-// HotspotModel placeholder — Fase 4
-type HotspotModel struct{}
-
-func NewHotspot() HotspotModel { return HotspotModel{} }
-func (m HotspotModel) Init() tea.Cmd { return nil }
-
-func (m HotspotModel) Update(msg tea.Msg) (HotspotModel, tea.Cmd) {
-	return m, nil
-}
-
-func (m HotspotModel) View() string {
-	return theme.CardStyle.Render(
-		theme.CardTitleStyle.Render("🔥 Hotspot") + "\n\n"+
-			"    Creación y control de hotspot disponible en Fase 4.",
-	)
-}
