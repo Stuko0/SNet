@@ -6,23 +6,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// SavedModel placeholder — Fase 3
-type SavedModel struct{}
-
-func NewSaved() SavedModel { return SavedModel{} }
-func (m SavedModel) Init() tea.Cmd { return nil }
-
-func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
-	return m, nil
-}
-
-func (m SavedModel) View() string {
-	return theme.CardStyle.Render(
-		theme.CardTitleStyle.Render("💾 Conexiones Guardadas") + "\n\n"+
-			"    Gestión de conexiones disponible en Fase 3.",
-	)
-}
-
 // VPNListModel placeholder — Fase 5
 type VPNListModel struct{}
 

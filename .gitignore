@@ -37,3 +37,6 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
+
+# Markdowns
+PLAN.md
