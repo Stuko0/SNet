@@ -18,6 +18,10 @@ type Client interface {
 	ConnectionUp(name string) error
 	ConnectionDown(name string) error
 	AddWiFiConnection(ssid, password string) error
+	HotspotStart(cfg HotspotConfig) error
+	HotspotStop() error
+	HotspotStatus() (*HotspotConfig, error)
+	GetHotspotIface() string
 }
 
 // Ensure nmcliClient implements Client.

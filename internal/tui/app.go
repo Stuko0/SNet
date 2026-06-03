@@ -245,6 +245,14 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 			{"r", "Refrescar"},
 			{"?", "Ayuda"},
 		}
+	case 4: // Hotspot
+		keys = []struct{ key, desc string }{
+			{"Tab/↓", "Navegar"},
+			{"Enter", "Iniciar/Detener"},
+			{"←/→", "Banda"},
+			{"r", "Refrescar"},
+			{"?", "Ayuda"},
+		}
 	default:
 		keys = []struct{ key, desc string }{
 			{"Tab", "Navegar"},
