@@ -33,11 +33,11 @@ type EditorModel struct {
 	connType  string
 	fields    []Field
 	focusIdx  int
-	spinner   tea.Model // reusamos el spinner
+	// spinner   tea.Model // reusamos el spinner
 	toast     string
 	toastErr  error
-	width     int
-	height    int
+	// width     int
+	// height    int
 }
 
 // NewEditor crea un editor para una conexión específica
