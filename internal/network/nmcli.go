@@ -318,3 +318,8 @@ func GetVPNs() ([]VPNConnection, error)               { return DefaultClient.Get
 func ConnectToWiFi(ssid, password string) error       { return DefaultClient.ConnectToWiFi(ssid, password) }
 func Disconnect(device string) error                  { return DefaultClient.Disconnect(device) }
 func DeleteConnection(name string) error              { return DefaultClient.DeleteConnection(name) }
+func GetConnectionPassword(name string) (string, error) { return DefaultClient.GetConnectionPassword(name) }
+func ModifyConnection(name, setting, value string) error { return DefaultClient.ModifyConnection(name, setting, value) }
+func ConnectionUp(name string) error                     { return DefaultClient.ConnectionUp(name) }
+func ConnectionDown(name string) error                   { return DefaultClient.ConnectionDown(name) }
+func AddWiFiConnection(ssid, password string) error      { return DefaultClient.AddWiFiConnection(ssid, password) }

@@ -236,6 +236,15 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 			{"Tab", "Siguiente"},
 			{"?", "Ayuda"},
 		}
+	case 2: // Saved
+		keys = []struct{ key, desc string }{
+			{"↑/↓", "Navegar"},
+			{"Enter", "Conectar"},
+			{"d", "Eliminar"},
+			{"p", "Password"},
+			{"r", "Refrescar"},
+			{"?", "Ayuda"},
+		}
 	default:
 		keys = []struct{ key, desc string }{
 			{"Tab", "Navegar"},

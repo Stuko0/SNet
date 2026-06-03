@@ -13,6 +13,11 @@ type Client interface {
 	ConnectToWiFi(ssid, password string) error
 	Disconnect(device string) error
 	DeleteConnection(name string) error
+	GetConnectionPassword(name string) (string, error)
+	ModifyConnection(name, setting, value string) error
+	ConnectionUp(name string) error
+	ConnectionDown(name string) error
+	AddWiFiConnection(ssid, password string) error
 }
 
 // Ensure nmcliClient implements Client.
