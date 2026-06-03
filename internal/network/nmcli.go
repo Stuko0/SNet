@@ -327,3 +327,6 @@ func HotspotStart(cfg HotspotConfig) error                  { return DefaultClie
 func HotspotStop() error                                     { return DefaultClient.HotspotStop() }
 func HotspotStatus() (*HotspotConfig, error)                 { return DefaultClient.HotspotStatus() }
 func GetHotspotIface() string                                { return DefaultClient.GetHotspotIface() }
+func AddOpenVPNConnection(name, remote, port, username, password string) error { return DefaultClient.AddOpenVPNConnection(name, remote, port, username, password) }
+func AddWireGuardConnection(name, iface, configFile string) error              { return DefaultClient.AddWireGuardConnection(name, iface, configFile) }
+func AddSSTPConnection(name, server, username, password string) error          { return DefaultClient.AddSSTPConnection(name, server, username, password) }

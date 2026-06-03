@@ -38,8 +38,6 @@ type HotspotModel struct {
 	err       error
 	toast     string
 	toastErr  error
-	// width     int
-	// height    int
 }
 
 func NewHotspot() HotspotModel {
