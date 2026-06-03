@@ -35,8 +35,6 @@ type SavedModel struct {
 	toastErr   error
 	err        error
 	password   string
-	// width      int
-	// height     int
 }
 
 func NewSaved() SavedModel {

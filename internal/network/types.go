@@ -22,6 +22,9 @@ type Client interface {
 	HotspotStop() error
 	HotspotStatus() (*HotspotConfig, error)
 	GetHotspotIface() string
+	AddOpenVPNConnection(name, remote, port, username, password string) error
+	AddWireGuardConnection(name, iface, configFile string) error
+	AddSSTPConnection(name, server, username, password string) error
 }
 
 // Ensure nmcliClient implements Client.

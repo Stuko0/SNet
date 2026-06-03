@@ -36,8 +36,6 @@ type EditorModel struct {
 	// spinner   tea.Model // reusamos el spinner
 	toast     string
 	toastErr  error
-	// width     int
-	// height    int
 }
 
 // NewEditor crea un editor para una conexión específica
