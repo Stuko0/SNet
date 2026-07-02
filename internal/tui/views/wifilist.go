@@ -27,14 +27,14 @@ const (
 
 // WifiListModel es la vista de escaneo y conexión Wi-Fi
 type WifiListModel struct {
-	state    wifiState
-	networks []network.WiFiNetwork
-	table    table.Model
-	spinner  spinner.Model
-	password textinput.Model
-	toast    string
-	toastErr error
-	err      error
+	state        wifiState
+	networks     []network.WiFiNetwork
+	table        table.Model
+	spinner      spinner.Model
+	password     textinput.Model
+	toast        string
+	toastErr     error
+	err          error
 	showPassword bool
 }
 
@@ -52,8 +52,8 @@ func NewWifiList() WifiListModel {
 	ti.Width = 40
 
 	return WifiListModel{
-		state:   wifiLoading,
-		spinner: s,
+		state:    wifiLoading,
+		spinner:  s,
 		password: ti,
 	}
 }
@@ -62,8 +62,6 @@ func NewWifiList() WifiListModel {
 func (m WifiListModel) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, scanNetworks)
 }
-
-// ─── Mensajes ────────────────────────────────────────────────
 
 type scanResultMsg struct {
 	networks []network.WiFiNetwork
@@ -86,14 +84,11 @@ func connectToNetwork(ssid, password string) tea.Msg {
 	return connectResultMsg{ssid: ssid, err: err}
 }
 
-// ─── Update ──────────────────────────────────────────────────
-
 func (m WifiListModel) Update(msg tea.Msg) (WifiListModel, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 
-	// ── Resultado del escaneo ──
 	case scanResultMsg:
 		if msg.err != nil {
 			m.err = msg.err
@@ -107,7 +102,6 @@ func (m WifiListModel) Update(msg tea.Msg) (WifiListModel, tea.Cmd) {
 		m.err = nil
 		return m, nil
 
-	// ── Resultado de la conexión ──
 	case connectResultMsg:
 		m.state = wifiDone
 		if msg.err != nil {
@@ -119,13 +113,11 @@ func (m WifiListModel) Update(msg tea.Msg) (WifiListModel, tea.Cmd) {
 		}
 		return m, nil
 
-	// ── Tick del spinner ──
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 
-	// ── Mensaje de refresco (desde tecla 'r') ──
 	case refreshMsg:
 		m.state = wifiLoading
 		m.toast = ""
@@ -134,11 +126,10 @@ func (m WifiListModel) Update(msg tea.Msg) (WifiListModel, tea.Cmd) {
 		cmds = append(cmds, m.spinner.Tick, scanNetworks)
 		return m, tea.Batch(cmds...)
 
-	// ── Entrada de teclado ──
 	case tea.KeyMsg:
-		// Estados que capturan TODAS las teclas
+
 		if m.state == wifiDone || m.state == wifiError {
-			// Cualquier tecla cierra el toast
+
 			m.state = wifiIdle
 			m.toast = ""
 			m.toastErr = nil
@@ -150,7 +141,6 @@ func (m WifiListModel) Update(msg tea.Msg) (WifiListModel, tea.Cmd) {
 			return m.handlePasswordKey(msg)
 		}
 
-		// Estado idle: navegación de tabla
 		if m.state == wifiIdle {
 			return m.handleIdleKey(msg)
 		}
@@ -158,8 +148,6 @@ func (m WifiListModel) Update(msg tea.Msg) (WifiListModel, tea.Cmd) {
 
 	return m, tea.Batch(cmds...)
 }
-
-// ─── Manejo de teclas en estado password ─────────────────────
 
 func (m WifiListModel) handlePasswordKey(msg tea.KeyMsg) (WifiListModel, tea.Cmd) {
 	switch msg.String() {
@@ -185,7 +173,7 @@ func (m WifiListModel) handlePasswordKey(msg tea.KeyMsg) (WifiListModel, tea.Cmd
 		return m, nil
 
 	case "ctrl+t":
-		// Toggle visibilidad de la contraseña
+
 		m.showPassword = !m.showPassword
 		if m.showPassword {
 			m.password.EchoMode = textinput.EchoNormal
@@ -201,8 +189,6 @@ func (m WifiListModel) handlePasswordKey(msg tea.KeyMsg) (WifiListModel, tea.Cmd
 	}
 }
 
-// ─── Manejo de teclas en estado idle ─────────────────────────
-
 func (m WifiListModel) handleIdleKey(msg tea.KeyMsg) (WifiListModel, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
@@ -213,7 +199,7 @@ func (m WifiListModel) handleIdleKey(msg tea.KeyMsg) (WifiListModel, tea.Cmd) {
 		return m.initiateConnection(ssid)
 
 	case "r":
-		// Refresh desde dentro de la vista
+
 		m.state = wifiLoading
 		m.toast = ""
 		return m, tea.Batch(m.spinner.Tick, scanNetworks)
@@ -227,7 +213,7 @@ func (m WifiListModel) handleIdleKey(msg tea.KeyMsg) (WifiListModel, tea.Cmd) {
 		return m, nil
 
 	case "esc":
-		// No hace nada especial en idle
+
 		return m, nil
 
 	default:
@@ -240,18 +226,18 @@ func (m WifiListModel) handleIdleKey(msg tea.KeyMsg) (WifiListModel, tea.Cmd) {
 
 // initiateConnection decide si pide contraseña o conecta directo
 func (m WifiListModel) initiateConnection(ssid string) (WifiListModel, tea.Cmd) {
-	// Buscar la red seleccionada
+
 	for _, n := range m.networks {
 		if n.SSID == ssid {
 			if n.Known || n.Security == "" || n.Security == "Open" || n.Security == "--" {
-				// Red conocida o abierta → conectar directo
+
 				m.state = wifiConnecting
 				return m, tea.Batch(
 					m.spinner.Tick,
 					func() tea.Msg { return connectToNetwork(ssid, "") },
 				)
 			}
-			// Red segura y no conocida → pedir contraseña
+
 			m.state = wifiPassword
 			m.password = textinput.New()
 			m.password.Placeholder = "Contraseña de " + ssid
@@ -264,7 +250,7 @@ func (m WifiListModel) initiateConnection(ssid string) (WifiListModel, tea.Cmd) 
 			return m, nil
 		}
 	}
-	// No encontrada
+
 	m.toast = fmt.Sprintf("Red %s no encontrada", ssid)
 	m.state = wifiError
 	return m, nil
@@ -281,21 +267,19 @@ func (m WifiListModel) getSelectedSSID() string {
 	return row[0]
 }
 
-// ─── View ─────────────────────────────────────────────────────
-
 func (m WifiListModel) View() string {
 	if m.state == wifiLoading && len(m.networks) == 0 {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("📶 Redes Wi-Fi") + "\n\n"+
-				m.spinner.View()+" Escaneando redes...",
+			theme.CardTitleStyle.Render("📶 Redes Wi-Fi") + "\n\n" +
+				m.spinner.View() + " Escaneando redes...",
 		)
 	}
 
 	if m.state == wifiConnecting {
 		ssid := m.getSelectedSSID()
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("📶 Redes Wi-Fi")+"\n\n"+
-				m.spinner.View()+" Conectando a "+ssid+"...",
+			theme.CardTitleStyle.Render("📶 Redes Wi-Fi") + "\n\n" +
+				m.spinner.View() + " Conectando a " + ssid + "...",
 		)
 	}
 
@@ -303,7 +287,6 @@ func (m WifiListModel) View() string {
 		return m.renderPasswordView()
 	}
 
-	// Toast de éxito/error
 	if m.state == wifiDone || m.state == wifiError {
 		view := m.renderTableView()
 		toast := m.renderToast()
@@ -325,7 +308,6 @@ func (m WifiListModel) renderTableView() string {
 		body = theme.TableStyle.Render(m.table.View())
 	}
 
-	// Footer de atajos para esta vista
 	help := lipgloss.NewStyle().Foreground(theme.ColorSubtle).Render(
 		"  ↑/↓: Navegar  Enter: Conectar  r: Buscar  ?: Ayuda",
 	)
@@ -355,10 +337,8 @@ func (m WifiListModel) renderPasswordView() string {
 		}() + " contraseña",
 	)
 
-	// Input de contraseña
 	input := m.password.View()
 
-	// Si está visible, mostrar lo que se ha escrito
 	if m.showPassword && m.password.Value() != "" {
 		input += "\n" + lipgloss.NewStyle().Foreground(theme.ColorWarning).Render(
 			"  Contraseña: "+m.password.Value(),
@@ -400,8 +380,6 @@ func (m WifiListModel) renderToast() string {
 	)
 }
 
-// ─── Construcción de la tabla ────────────────────────────────
-
 func buildTable(networks []network.WiFiNetwork) table.Model {
 	columns := []table.Column{
 		{Title: "SSID", Width: 28},
@@ -411,7 +389,6 @@ func buildTable(networks []network.WiFiNetwork) table.Model {
 		{Title: "", Width: 4},
 	}
 
-	// Estilo de tabla base
 	s := table.DefaultStyles()
 	s.Header = s.Header.
 		BorderStyle(lipgloss.NormalBorder()).
@@ -457,7 +434,7 @@ func truncateSSID(ssid string, maxLen int) string {
 	if len(ssid) > maxLen {
 		return ssid[:maxLen-1] + "…"
 	}
-	// Rellenar con espacios para alineación
+
 	if len(ssid) < maxLen {
 		return ssid + strings.Repeat(" ", maxLen-len(ssid))
 	}

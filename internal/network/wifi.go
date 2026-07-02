@@ -11,7 +11,7 @@ func GetWiFiDevice() string {
 	if state.ActiveType == "wifi" {
 		return state.ActiveDevice
 	}
-	// Buscar cualquier dispositivo Wi-Fi aunque no esté conectado
+
 	out, err := runCmd("-t", "-f", "DEVICE,TYPE", "device", "status")
 	if err != nil {
 		return ""

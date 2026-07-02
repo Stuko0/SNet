@@ -16,7 +16,7 @@ import (
 type savedState int
 
 const (
-	savedLoading   savedState = iota
+	savedLoading savedState = iota
 	savedIdle
 	savedConnecting
 	savedConfirmDelete
@@ -27,14 +27,14 @@ const (
 
 // SavedModel gestiona las conexiones guardadas de NetworkManager
 type SavedModel struct {
-	state      savedState
-	conns      []network.Connection
-	table      table.Model
-	spinner    spinner.Model
-	toast      string
-	toastErr   error
-	err        error
-	password   string
+	state    savedState
+	conns    []network.Connection
+	table    table.Model
+	spinner  spinner.Model
+	toast    string
+	toastErr error
+	err      error
+	password string
 }
 
 func NewSaved() SavedModel {
@@ -50,8 +50,6 @@ func NewSaved() SavedModel {
 func (m SavedModel) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, fetchConnections)
 }
-
-// ─── Mensajes ────────────────────────────────────────────────
 
 type connListMsg struct {
 	conns []network.Connection
@@ -87,8 +85,6 @@ func fetchPassword(name string) tea.Msg {
 	return connActionMsg{action: "password", name: name, err: nil}
 }
 
-// ─── Update ──────────────────────────────────────────────────
-
 func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 	switch msg := msg.(type) {
 
@@ -115,7 +111,7 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 			} else {
 				m.toast = fmt.Sprintf("✓ Conectado a %s", msg.name)
 				m.toastErr = nil
-				// Refresh list after connect
+
 				return m, fetchConnections
 			}
 		case "delete":
@@ -126,7 +122,7 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 			} else {
 				m.toast = fmt.Sprintf("✓ Eliminada: %s", msg.name)
 				m.toastErr = nil
-				// Refresh list
+
 				return m, fetchConnections
 			}
 		case "password":
@@ -162,7 +158,7 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 			return m.handleDeleteConfirm(msg)
 		}
 		if m.state == savedShowingPwd {
-			// Cualquier tecla cierra el password
+
 			m.state = savedIdle
 			m.password = ""
 			return m, nil
@@ -174,8 +170,6 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 
 	return m, nil
 }
-
-// ─── Manejo de teclas ────────────────────────────────────────
 
 func (m SavedModel) handleDeleteConfirm(msg tea.KeyMsg) (SavedModel, tea.Cmd) {
 	switch msg.String() {
@@ -212,6 +206,15 @@ func (m SavedModel) handleIdleKey(msg tea.KeyMsg) (SavedModel, tea.Cmd) {
 		}
 		m.state = savedConfirmDelete
 		return m, nil
+
+	case "e":
+		if sel == "" {
+			return m, nil
+		}
+		connType := m.getSelectedType()
+		return m, func() tea.Msg {
+			return EditConnectionMsg{Name: sel, Type: connType}
+		}
 
 	case "p":
 		if sel == "" {
@@ -253,7 +256,20 @@ func (m SavedModel) getSelectedName() string {
 	return row[0]
 }
 
-// ─── View ─────────────────────────────────────────────────────
+func (m SavedModel) getSelectedType() string {
+	selName := m.getSelectedName()
+	for _, c := range m.conns {
+		if c.Name == selName {
+			return c.Type
+		}
+	}
+	return ""
+}
+
+type EditConnectionMsg struct {
+	Name string
+	Type string
+}
 
 func (m SavedModel) View() string {
 	if m.state == savedLoading {
@@ -262,15 +278,15 @@ func (m SavedModel) View() string {
 			label = "Cargando conexiones..."
 		}
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("💾 Conexiones Guardadas") + "\n\n"+
-				m.spinner.View()+" "+label,
+			theme.CardTitleStyle.Render("💾 Conexiones Guardadas") + "\n\n" +
+				m.spinner.View() + " " + label,
 		)
 	}
 
 	if m.state == savedConnecting {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("💾 Conexiones Guardadas")+"\n\n"+
-				m.spinner.View()+" Conectando a "+m.getSelectedName()+"...",
+			theme.CardTitleStyle.Render("💾 Conexiones Guardadas") + "\n\n" +
+				m.spinner.View() + " Conectando a " + m.getSelectedName() + "...",
 		)
 	}
 
@@ -282,7 +298,7 @@ func (m SavedModel) View() string {
 		if m.password != "" {
 			return m.renderTableView()
 		}
-		// Password view just shown briefly, go back after keypress
+
 		return m.renderTableView()
 	}
 
@@ -354,8 +370,6 @@ func (m SavedModel) renderToast() string {
 	}
 	return theme.ToastStyle.Render(style.Render(icon + " " + m.toast))
 }
-
-// ─── Construcción de la tabla ────────────────────────────────
 
 func buildConnTable(conns []network.Connection) table.Model {
 	columns := []table.Column{

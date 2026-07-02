@@ -15,19 +15,19 @@ import (
 type hotspotState int
 
 const (
-	hotspotIdle      hotspotState = iota
-	hotspotScanning               // obteniendo estado actual
-	hotspotStarting               // iniciando hotspot
-	hotspotStopping               // deteniendo hotspot
+	hotspotIdle     hotspotState = iota
+	hotspotScanning              // obteniendo estado actual
+	hotspotStarting              // iniciando hotspot
+	hotspotStopping              // deteniendo hotspot
 	hotspotDone
 	hotspotError
 )
 
 // HotspotModel controla la creación y gestión del hotspot
 type HotspotModel struct {
-	state      hotspotState
-	status     *network.HotspotConfig
-	spinner    spinner.Model
+	state   hotspotState
+	status  *network.HotspotConfig
+	spinner spinner.Model
 
 	// Campos del formulario (solo visibles si hotspot inactivo)
 	ssidInput     textinput.Model
@@ -35,9 +35,9 @@ type HotspotModel struct {
 	band          string // "bg" o "a"
 	focusField    int    // 0=SSID, 1=Password, 2=Band, 3=Start
 
-	err       error
-	toast     string
-	toastErr  error
+	err      error
+	toast    string
+	toastErr error
 }
 
 func NewHotspot() HotspotModel {
@@ -72,8 +72,6 @@ func (m HotspotModel) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, fetchHotspotStatus)
 }
 
-// ─── Mensajes ────────────────────────────────────────────────
-
 type hotspotStatusMsg struct {
 	status *network.HotspotConfig
 	err    error
@@ -99,8 +97,6 @@ func stopHotspotAction() tea.Msg {
 	return hotspotActionResultMsg{action: "stop", err: err}
 }
 
-// ─── Update ──────────────────────────────────────────────────
-
 func (m HotspotModel) Update(msg tea.Msg) (HotspotModel, tea.Cmd) {
 	switch msg := msg.(type) {
 
@@ -111,7 +107,7 @@ func (m HotspotModel) Update(msg tea.Msg) (HotspotModel, tea.Cmd) {
 		}
 		if msg.status != nil {
 			m.status = msg.status
-			// Si está activo, rellenar campos con datos actuales
+
 			if m.status.Active {
 				m.ssidInput.SetValue(m.status.SSID)
 				if m.status.Password != "" {
@@ -134,7 +130,7 @@ func (m HotspotModel) Update(msg tea.Msg) (HotspotModel, tea.Cmd) {
 			m.toastErr = nil
 			if msg.action == "start" {
 				m.toast = "✓ Hotspot iniciado"
-				// Refresh status
+
 				return m, fetchHotspotStatus
 			} else {
 				m.toast = "✓ Hotspot detenido"
@@ -209,27 +205,26 @@ func (m HotspotModel) handleKey(msg tea.KeyMsg) (HotspotModel, tea.Cmd) {
 }
 
 func (m HotspotModel) handleEnter() (HotspotModel, tea.Cmd) {
-	// Si el hotspot ya está activo, Enter detiene
+
 	if m.status != nil && m.status.Active {
 		m.state = hotspotStopping
 		return m, tea.Batch(m.spinner.Tick, stopHotspotAction)
 	}
 
-	// Si no está activo, validar e iniciar
 	switch m.focusField {
-	case 0: // SSID → password
+	case 0:
 		m.focusField = 1
 		m.updateFocus()
 		return m, nil
-	case 1: // Password → band
+	case 1:
 		m.focusField = 2
 		m.updateFocus()
 		return m, nil
-	case 2: // Band → start
+	case 2:
 		m.focusField = 3
 		m.updateFocus()
 		return m, nil
-	case 3: // Start
+	case 3:
 		return m.doStart()
 	default:
 		return m, nil
@@ -237,7 +232,7 @@ func (m HotspotModel) handleEnter() (HotspotModel, tea.Cmd) {
 }
 
 func (m HotspotModel) doStart() (HotspotModel, tea.Cmd) {
-	// Validar SSID
+
 	ssid := m.ssidInput.Value()
 	if ssid == "" {
 		m.toast = "✗ El SSID no puede estar vacío"
@@ -246,7 +241,6 @@ func (m HotspotModel) doStart() (HotspotModel, tea.Cmd) {
 		return m, nil
 	}
 
-	// Validar password (mín 8 chars)
 	pwd := m.passwordInput.Value()
 	if pwd == "" {
 		m.toast = "✗ La contraseña es obligatoria"
@@ -308,27 +302,25 @@ func (m HotspotModel) updateFocusedField(msg tea.KeyMsg) (HotspotModel, tea.Cmd)
 	}
 }
 
-// ─── View ─────────────────────────────────────────────────────
-
 func (m HotspotModel) View() string {
 	if m.state == hotspotScanning {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔥 Hotspot") + "\n\n"+
-				m.spinner.View()+" Verificando estado...",
+			theme.CardTitleStyle.Render("🔥 Hotspot") + "\n\n" +
+				m.spinner.View() + " Verificando estado...",
 		)
 	}
 
 	if m.state == hotspotStarting {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔥 Hotspot")+"\n\n"+
-				m.spinner.View()+" Iniciando hotspot...",
+			theme.CardTitleStyle.Render("🔥 Hotspot") + "\n\n" +
+				m.spinner.View() + " Iniciando hotspot...",
 		)
 	}
 
 	if m.state == hotspotStopping {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔥 Hotspot")+"\n\n"+
-				m.spinner.View()+" Deteniendo hotspot...",
+			theme.CardTitleStyle.Render("🔥 Hotspot") + "\n\n" +
+				m.spinner.View() + " Deteniendo hotspot...",
 		)
 	}
 
@@ -338,7 +330,6 @@ func (m HotspotModel) View() string {
 func (m HotspotModel) renderContent() string {
 	title := theme.CardTitleStyle.Render("🔥 Hotspot")
 
-	// ── Si el hotspot está activo → panel de control ──
 	if m.status != nil && m.status.Active {
 		statusBox := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -363,7 +354,6 @@ func (m HotspotModel) renderContent() string {
 		return title + "\n\n" + statusBox + "\n\n" + actions
 	}
 
-	// ── Si está inactivo → formulario de creación ──
 	configBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorBorder).
@@ -372,21 +362,18 @@ func (m HotspotModel) renderContent() string {
 
 	var fields []string
 
-	// SSID
 	ssidLabel := "  "
 	if m.focusField == 0 {
 		ssidLabel = lipgloss.NewStyle().Foreground(theme.ColorPrimary).Render("▸ ")
 	}
 	fields = append(fields, ssidLabel+theme.LabelStyle.Render("SSID:")+" "+m.ssidInput.View())
 
-	// Password
 	pwdLabel := "  "
 	if m.focusField == 1 {
 		pwdLabel = lipgloss.NewStyle().Foreground(theme.ColorPrimary).Render("▸ ")
 	}
 	fields = append(fields, pwdLabel+theme.LabelStyle.Render("Password:")+" "+m.passwordInput.View())
 
-	// Banda
 	bandLabel := "  "
 	if m.focusField == 2 {
 		bandLabel = lipgloss.NewStyle().Foreground(theme.ColorPrimary).Render("▸ ")
@@ -399,7 +386,6 @@ func (m HotspotModel) renderContent() string {
 	}
 	fields = append(fields, bandLabel+bandWidget)
 
-	// Botón Start
 	startLabel := "  "
 	if m.focusField == 3 {
 		startLabel = lipgloss.NewStyle().Foreground(theme.ColorPrimary).Render("▸ ")

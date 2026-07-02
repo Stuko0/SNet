@@ -16,12 +16,12 @@ import (
 type vpnState int
 
 const (
-	vpnLoading   vpnState = iota
+	vpnLoading vpnState = iota
 	vpnIdle
 	vpnConnecting
 	vpnDisconnecting
-	vpnAddType       // seleccionar tipo de VPN a añadir
-	vpnAddConfig     // configurar nueva VPN
+	vpnAddType   // seleccionar tipo de VPN a añadir
+	vpnAddConfig // configurar nueva VPN
 	vpnDone
 	vpnError
 )
@@ -37,15 +37,15 @@ type VPNListModel struct {
 	err      error
 
 	// Estado para añadir VPN
-	addType      string   // "openvpn", "wireguard", "sstp"
-	addField     int
-	addName      textinput.Model
-	addServer    textinput.Model
-	addPort      textinput.Model
-	addUser      textinput.Model
-	addPassword  textinput.Model
-	addIface     textinput.Model
-	addConfig    textinput.Model // ruta a archivo config (WireGuard)
+	addType     string // "openvpn", "wireguard", "sstp"
+	addField    int
+	addName     textinput.Model
+	addServer   textinput.Model
+	addPort     textinput.Model
+	addUser     textinput.Model
+	addPassword textinput.Model
+	addIface    textinput.Model
+	addConfig   textinput.Model // ruta a archivo config (WireGuard)
 }
 
 func NewVPNList() VPNListModel {
@@ -88,8 +88,6 @@ func (m VPNListModel) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, fetchVPNs)
 }
 
-// ─── Mensajes ────────────────────────────────────────────────
-
 type vpnListMsg struct {
 	vpns []network.VPNConnection
 	err  error
@@ -129,8 +127,6 @@ func addVPN(name, vpnType, server, port, user, password string) tea.Msg {
 	}
 	return vpnActionMsg{action: "add", err: err}
 }
-
-// ─── Update ──────────────────────────────────────────────────
 
 func (m VPNListModel) Update(msg tea.Msg) (VPNListModel, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -198,8 +194,6 @@ func (m VPNListModel) Update(msg tea.Msg) (VPNListModel, tea.Cmd) {
 	return m, nil
 }
 
-// ─── Manejo de teclas ────────────────────────────────────────
-
 func (m VPNListModel) handleIdleKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd) {
 	sel := m.getSelectedName()
 
@@ -208,7 +202,7 @@ func (m VPNListModel) handleIdleKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd) {
 		if sel == "" {
 			return m, nil
 		}
-		// Si ya está activa, desconectar; si no, conectar
+
 		if m.isActive(sel) {
 			m.state = vpnDisconnecting
 			return m, tea.Batch(m.spinner.Tick, func() tea.Msg {
@@ -246,7 +240,7 @@ func (m VPNListModel) handleIdleKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd) {
 func (m VPNListModel) handleAddTypeKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		// Por defecto selecciona OpenVPN
+
 		m.addType = "openvpn"
 		m.state = vpnAddConfig
 		m.addField = 0
@@ -314,11 +308,11 @@ func (m VPNListModel) handleAddConfigKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd)
 func (m VPNListModel) addFieldCount() int {
 	switch m.addType {
 	case "openvpn":
-		return 5 // name, server, port, user, password
+		return 5
 	case "wireguard":
-		return 3 // name, iface, config
+		return 3
 	case "sstp":
-		return 4 // name, server, user, password
+		return 4
 	default:
 		return 2
 	}
@@ -361,7 +355,7 @@ func (m *VPNListModel) updateAddFocus() {
 			m.addPassword.Focus()
 		}
 	case 4:
-		_ = m.addConfig.Focus() // OpenVPN: password
+		_ = m.addConfig.Focus()
 	}
 }
 
@@ -419,24 +413,22 @@ func (m VPNListModel) isActive(name string) bool {
 	return false
 }
 
-// ─── View ─────────────────────────────────────────────────────
-
 func (m VPNListModel) View() string {
 	switch m.state {
 	case vpnLoading:
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔒 VPN") + "\n\n"+
-				m.spinner.View()+" Cargando VPNs...",
+			theme.CardTitleStyle.Render("🔒 VPN") + "\n\n" +
+				m.spinner.View() + " Cargando VPNs...",
 		)
 	case vpnConnecting:
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔒 VPN")+"\n\n"+
-				m.spinner.View()+" Conectando VPN...",
+			theme.CardTitleStyle.Render("🔒 VPN") + "\n\n" +
+				m.spinner.View() + " Conectando VPN...",
 		)
 	case vpnDisconnecting:
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔒 VPN")+"\n\n"+
-				m.spinner.View()+" Desconectando VPN...",
+			theme.CardTitleStyle.Render("🔒 VPN") + "\n\n" +
+				m.spinner.View() + " Desconectando VPN...",
 		)
 	case vpnAddType:
 		return m.renderAddType()
@@ -560,8 +552,6 @@ func (m VPNListModel) renderToast() string {
 	}
 	return theme.ToastStyle.Render(style.Render(icon + " " + m.toast))
 }
-
-// ─── Construcción de la tabla ────────────────────────────────
 
 func buildVPNTable(vpns []network.VPNConnection) table.Model {
 	columns := []table.Column{

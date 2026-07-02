@@ -131,7 +131,6 @@ func (m DashboardModel) View() string {
 		signalBars = fmt.Sprintf(" %s (%d%%)", bars, state.SignalStrength)
 	}
 
-	// IP formateada (sin /subnet)
 	ipDisplay := state.IPAddress
 	if idx := strings.Index(ipDisplay, "/"); idx >= 0 {
 		ipDisplay = ipDisplay[:idx]

@@ -8,7 +8,7 @@ import (
 
 // runCmd ejecuta nmcli y devuelve stdout
 func runCmd(args ...string) (string, error) {
-	// Forzamos LC_ALL=C para tener output en inglés siempre
+
 	cmd := exec.Command("nmcli", args...)
 	cmd.Env = append(cmd.Environ(), "LC_ALL=C")
 	out, err := cmd.Output()
@@ -67,7 +67,6 @@ func (c *NmcliClient) GetActiveConnection() (*NetworkState, error) {
 		Connectivity: c.GetConnectivity(),
 	}
 
-	// nmcli -t -f DEVICE,TYPE,CONNECTION device status
 	out, err := runCmd("-t", "-f", "DEVICE,TYPE,CONNECTION", "device", "status")
 	if err != nil {
 		return state, err
@@ -93,9 +92,8 @@ func (c *NmcliClient) GetActiveConnection() (*NetworkState, error) {
 		}
 	}
 
-	// IP, gateway, DNS
 	if state.ActiveDevice != "" {
-		// nmcli -t -f IP4.ADDRESS device show <dev>
+
 		devInfo, _ := runCmd("-t", "-f", "IP4.ADDRESS,IP4.GATEWAY,IP4.DNS", "device", "show", state.ActiveDevice)
 		for _, line := range strings.Split(devInfo, "\n") {
 			if strings.HasPrefix(line, "IP4.ADDRESS:") {
@@ -112,21 +110,18 @@ func (c *NmcliClient) GetActiveConnection() (*NetworkState, error) {
 			}
 		}
 
-		// Velocidad Wi-Fi
 		if state.ActiveType == "wifi" {
-			// nmcli -t -f GENERAL.SPEED device show <dev>
+
 			speedOut, _ := runCmd("-t", "-f", "GENERAL.SPEED", "device", "show", state.ActiveDevice)
 			if strings.HasPrefix(speedOut, "GENERAL.SPEED:") {
 				state.Speed = strings.TrimPrefix(speedOut, "GENERAL.SPEED:")
 			}
 
-			// Señal
-			signalOut, _ := runCmd("-t", "-f", "SIGNAL", "device", "wifi", "list", "--rescan", "no")
+			signalOut, _ := runCmd("-t", "-f", "SSID,SIGNAL", "device", "wifi", "list", "--rescan", "no")
 			for _, line := range strings.Split(signalOut, "\n") {
-				// Formato: SSID:SEC:SIGNAL:FREQ:BSSID:MODE:CHAN
 				parts := strings.Split(line, ":")
-				if len(parts) >= 3 && parts[0] == state.ActiveSSID {
-					fmt.Sscanf(parts[2], "%d", &state.SignalStrength)
+				if len(parts) >= 2 && parts[0] == state.ActiveSSID {
+					fmt.Sscanf(parts[1], "%d", &state.SignalStrength)
 					break
 				}
 			}
@@ -150,7 +145,6 @@ func (c *NmcliClient) ScanWiFi(rescan bool) ([]WiFiNetwork, error) {
 		return nil, err
 	}
 
-	// Obtener conexiones conocidas para marcar las conocidas
 	known := getKnownSSIDs()
 
 	lines := strings.Split(out, "\n")
@@ -207,7 +201,6 @@ func (c *NmcliClient) GetConnections() ([]Connection, error) {
 		return nil, err
 	}
 
-	// Obtener conexión activa para marcar
 	activeConns := getActiveConnNames()
 
 	var conns []Connection
@@ -302,31 +295,39 @@ func (c *NmcliClient) DeleteConnection(name string) error {
 	return err
 }
 
-// ============================================================
-// Standalone convenience functions (delegate to DefaultClient)
-// ============================================================
-
 // DefaultClient is the package-level client used by convenience functions.
 var DefaultClient = &NmcliClient{}
 
-func GetGeneralStatus() string                      { return DefaultClient.GetGeneralStatus() }
-func GetConnectivity() ConnectivityStatus            { return DefaultClient.GetConnectivity() }
-func GetActiveConnection() (*NetworkState, error)    { return DefaultClient.GetActiveConnection() }
-func ScanWiFi(rescan bool) ([]WiFiNetwork, error)    { return DefaultClient.ScanWiFi(rescan) }
-func GetConnections() ([]Connection, error)           { return DefaultClient.GetConnections() }
-func GetVPNs() ([]VPNConnection, error)               { return DefaultClient.GetVPNs() }
-func ConnectToWiFi(ssid, password string) error       { return DefaultClient.ConnectToWiFi(ssid, password) }
-func Disconnect(device string) error                  { return DefaultClient.Disconnect(device) }
-func DeleteConnection(name string) error              { return DefaultClient.DeleteConnection(name) }
-func GetConnectionPassword(name string) (string, error) { return DefaultClient.GetConnectionPassword(name) }
-func ModifyConnection(name, setting, value string) error { return DefaultClient.ModifyConnection(name, setting, value) }
-func ConnectionUp(name string) error                     { return DefaultClient.ConnectionUp(name) }
-func ConnectionDown(name string) error                   { return DefaultClient.ConnectionDown(name) }
-func AddWiFiConnection(ssid, password string) error      { return DefaultClient.AddWiFiConnection(ssid, password) }
-func HotspotStart(cfg HotspotConfig) error                  { return DefaultClient.HotspotStart(cfg) }
-func HotspotStop() error                                     { return DefaultClient.HotspotStop() }
-func HotspotStatus() (*HotspotConfig, error)                 { return DefaultClient.HotspotStatus() }
-func GetHotspotIface() string                                { return DefaultClient.GetHotspotIface() }
-func AddOpenVPNConnection(name, remote, port, username, password string) error { return DefaultClient.AddOpenVPNConnection(name, remote, port, username, password) }
-func AddWireGuardConnection(name, iface, configFile string) error              { return DefaultClient.AddWireGuardConnection(name, iface, configFile) }
-func AddSSTPConnection(name, server, username, password string) error          { return DefaultClient.AddSSTPConnection(name, server, username, password) }
+func GetGeneralStatus() string                    { return DefaultClient.GetGeneralStatus() }
+func GetConnectivity() ConnectivityStatus         { return DefaultClient.GetConnectivity() }
+func GetActiveConnection() (*NetworkState, error) { return DefaultClient.GetActiveConnection() }
+func ScanWiFi(rescan bool) ([]WiFiNetwork, error) { return DefaultClient.ScanWiFi(rescan) }
+func GetConnections() ([]Connection, error)       { return DefaultClient.GetConnections() }
+func GetVPNs() ([]VPNConnection, error)           { return DefaultClient.GetVPNs() }
+func ConnectToWiFi(ssid, password string) error   { return DefaultClient.ConnectToWiFi(ssid, password) }
+func Disconnect(device string) error              { return DefaultClient.Disconnect(device) }
+func DeleteConnection(name string) error          { return DefaultClient.DeleteConnection(name) }
+func GetConnectionPassword(name string) (string, error) {
+	return DefaultClient.GetConnectionPassword(name)
+}
+func ModifyConnection(name, setting, value string) error {
+	return DefaultClient.ModifyConnection(name, setting, value)
+}
+func ConnectionUp(name string) error   { return DefaultClient.ConnectionUp(name) }
+func ConnectionDown(name string) error { return DefaultClient.ConnectionDown(name) }
+func AddWiFiConnection(ssid, password string) error {
+	return DefaultClient.AddWiFiConnection(ssid, password)
+}
+func HotspotStart(cfg HotspotConfig) error   { return DefaultClient.HotspotStart(cfg) }
+func HotspotStop() error                     { return DefaultClient.HotspotStop() }
+func HotspotStatus() (*HotspotConfig, error) { return DefaultClient.HotspotStatus() }
+func GetHotspotIface() string                { return DefaultClient.GetHotspotIface() }
+func AddOpenVPNConnection(name, remote, port, username, password string) error {
+	return DefaultClient.AddOpenVPNConnection(name, remote, port, username, password)
+}
+func AddWireGuardConnection(name, iface, configFile string) error {
+	return DefaultClient.AddWireGuardConnection(name, iface, configFile)
+}
+func AddSSTPConnection(name, server, username, password string) error {
+	return DefaultClient.AddSSTPConnection(name, server, username, password)
+}

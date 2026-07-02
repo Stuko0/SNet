@@ -23,9 +23,11 @@ type Model struct {
 	vpnList   views.VPNListModel
 	hotspot   views.HotspotModel
 
+	editor *views.EditorModel
+
 	// Overlays
-	showHelp   bool
-	quitting   bool
+	showHelp bool
+	quitting bool
 }
 
 func NewModel() Model {
@@ -54,6 +56,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
+		return m, nil
+
+	case views.EditConnectionMsg:
+		editor := views.NewEditor(msg.Name, msg.Type)
+		m.editor = &editor
 		return m, nil
 
 	case tea.KeyMsg:
@@ -97,6 +104,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return views.RefreshCmd()
 			}
 		}
+
+		if m.editor != nil {
+			if keyMatches(msg, Keys.Escape) && !m.editor.IsDone() {
+				m.editor = nil
+				return m, nil
+			}
+			var cmd tea.Cmd
+			updatedEditor, cmd := m.editor.Update(msg)
+			m.editor = &updatedEditor
+			if m.editor.IsDone() && keyMatches(msg, Keys.Escape) {
+				m.editor = nil
+				return m, func() tea.Msg { return views.RefreshCmd() }
+			}
+			return m, cmd
+		}
 	}
 
 	// Pasar mensaje a la vista activa
@@ -124,7 +146,6 @@ func (m Model) View() string {
 			Render("Inicializando nmtui...")
 	}
 
-	// Header
 	header := lipgloss.JoinHorizontal(lipgloss.Center,
 		theme.LogoStyle.Render("📡 nmtui"),
 		theme.TitleStyle.Render("v0.1.0"),
@@ -132,7 +153,6 @@ func (m Model) View() string {
 		theme.LabelStyle.Render("NetworkManager TUI"),
 	)
 
-	// Tabs
 	tabRow := renderTabs(m.activeTab)
 
 	// Contenido
@@ -156,16 +176,21 @@ func (m Model) View() string {
 	}
 	content = lipgloss.NewStyle().Width(contentWidth).Render(content)
 
-	// Footer
+	if m.editor != nil {
+		editorView := lipgloss.Place(m.width, m.height,
+			lipgloss.Center, lipgloss.Center,
+			m.editor.View(),
+		)
+		return editorView
+	}
+
 	footer := renderFooter(m.quitting, m.showHelp, m.activeTab)
 
-	// Help overlay
 	if m.showHelp {
 		helpView := renderHelp(m.width, m.height)
 		return helpView
 	}
 
-	// Quit confirmation
 	if m.quitting {
 		quitView := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -221,14 +246,14 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 	var keys []struct{ key, desc string }
 
 	switch activeTab {
-	case 0: // Dashboard
+	case 0:
 		keys = []struct{ key, desc string }{
 			{"Tab", "Navegar"},
 			{"r", "Refresh"},
 			{"?", "Ayuda"},
 			{"Ctrl+q", "Salir"},
 		}
-	case 1: // Wi-Fi
+	case 1:
 		keys = []struct{ key, desc string }{
 			{"↑/↓", "Navegar"},
 			{"Enter", "Conectar"},
@@ -236,7 +261,7 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 			{"Tab", "Siguiente"},
 			{"?", "Ayuda"},
 		}
-	case 2: // Saved
+	case 2:
 		keys = []struct{ key, desc string }{
 			{"↑/↓", "Navegar"},
 			{"Enter", "Conectar"},
@@ -245,7 +270,7 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 			{"r", "Refrescar"},
 			{"?", "Ayuda"},
 		}
-	case 3: // VPN
+	case 3:
 		keys = []struct{ key, desc string }{
 			{"↑/↓", "Navegar"},
 			{"Enter", "Conectar/Desconectar"},
@@ -253,7 +278,7 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 			{"r", "Refrescar"},
 			{"?", "Ayuda"},
 		}
-	case 4: // Hotspot
+	case 4:
 		keys = []struct{ key, desc string }{
 			{"Tab/↓", "Navegar"},
 			{"Enter", "Iniciar/Detener"},

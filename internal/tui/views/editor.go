@@ -28,14 +28,14 @@ type Field struct {
 
 // EditorModel es un formulario genérico para editar conexiones
 type EditorModel struct {
-	state     editorState
-	connName  string
-	connType  string
-	fields    []Field
-	focusIdx  int
+	state    editorState
+	connName string
+	connType string
+	fields   []Field
+	focusIdx int
 	// spinner   tea.Model // reusamos el spinner
-	toast     string
-	toastErr  error
+	toast    string
+	toastErr error
 }
 
 // NewEditor crea un editor para una conexión específica
@@ -89,7 +89,6 @@ func buildFields(connType string) []Field {
 		)
 	}
 
-	// Campos comunes de IP
 	fields = append(fields,
 		Field{
 			Label:   "IPv4 (manual)",
@@ -128,8 +127,6 @@ func newInput(placeholder string, password bool) textinput.Model {
 	return ti
 }
 
-// ─── Mensajes ────────────────────────────────────────────────
-
 type editorSaveMsg struct {
 	err error
 }
@@ -147,8 +144,6 @@ func saveConnection(name string, fields []Field) tea.Msg {
 	return editorSaveMsg{}
 }
 
-// ─── Update ──────────────────────────────────────────────────
-
 func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
 	switch msg := msg.(type) {
 
@@ -165,7 +160,7 @@ func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		// Toast lo cierra cualquier tecla
+
 		if m.state == editorDone || m.state == editorError {
 			m.state = editorEditing
 			m.toast = ""
@@ -188,14 +183,14 @@ func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
 			return m, nil
 
 		case "enter":
-			// Si estamos en el último campo, guardar
+
 			if m.focusIdx == len(m.fields)-1 {
 				m.state = editorSaving
 				return m, func() tea.Msg {
 					return saveConnection(m.connName, m.fields)
 				}
 			}
-			// Sino, siguiente campo
+
 			m.focusIdx = (m.focusIdx + 1) % len(m.fields)
 			m.updateFocus()
 			return m, nil
@@ -221,12 +216,10 @@ func (m *EditorModel) updateFocus() {
 	}
 }
 
-// ─── View ─────────────────────────────────────────────────────
-
 func (m EditorModel) View() string {
 	if m.state == editorSaving {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("💾 Editando: "+m.connName)+"\n\n"+
+			theme.CardTitleStyle.Render("💾 Editando: "+m.connName) + "\n\n" +
 				"Guardando cambios...",
 		)
 	}
@@ -273,5 +266,5 @@ func (m EditorModel) View() string {
 func (m EditorModel) Init() tea.Cmd { return nil }
 
 // Helpers públicos para cerrar el editor
-func (m EditorModel) IsDone() bool    { return m.state == editorDone || m.state == editorError }
+func (m EditorModel) IsDone() bool     { return m.state == editorDone || m.state == editorError }
 func (m EditorModel) ConnName() string { return m.connName }
