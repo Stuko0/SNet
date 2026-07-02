@@ -4,19 +4,19 @@ import "github.com/charmbracelet/bubbles/key"
 
 // KeyMap define todas las teclas de la aplicación
 type KeyMap struct {
-	Quit    key.Binding
-	Help    key.Binding
-	Refresh key.Binding
-	Tab     key.Binding
+	Quit     key.Binding
+	Help     key.Binding
+	Refresh  key.Binding
+	Tab      key.Binding
 	ShiftTab key.Binding
-	Enter   key.Binding
-	Escape  key.Binding
-	Up      key.Binding
-	Down    key.Binding
-	Delete  key.Binding
-	Edit    key.Binding
-	New     key.Binding
-	Back    key.Binding
+	Enter    key.Binding
+	Escape   key.Binding
+	Up       key.Binding
+	Down     key.Binding
+	Delete   key.Binding
+	Edit     key.Binding
+	New      key.Binding
+	Back     key.Binding
 }
 
 var Keys = KeyMap{

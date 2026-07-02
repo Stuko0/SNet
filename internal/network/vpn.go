@@ -8,8 +8,8 @@ import (
 type VPNAuthType string
 
 const (
-	VPNAuthPassword VPNAuthType = "password"
-	VPNAuthCert     VPNAuthType = "cert"
+	VPNAuthPassword  VPNAuthType = "password"
+	VPNAuthCert      VPNAuthType = "cert"
 	VPNAuthStaticKey VPNAuthType = "static-key"
 )
 
@@ -22,7 +22,6 @@ func (c *NmcliClient) AddOpenVPNConnection(name, remote, port, username, passwor
 		port = "1194"
 	}
 
-	// Primero crear la conexión base
 	args := []string{
 		"connection", "add",
 		"type", "vpn",
@@ -39,7 +38,6 @@ func (c *NmcliClient) AddOpenVPNConnection(name, remote, port, username, passwor
 		return fmt.Errorf("crear conexión OpenVPN: %w", err)
 	}
 
-	// Establecer credenciales
 	if username != "" && password != "" {
 		_, err = runCmd("connection", "modify", name,
 			"vpn.user-name", username,

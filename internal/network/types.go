@@ -37,17 +37,17 @@ func NewClient() *NmcliClient { return &NmcliClient{} }
 
 // NetworkState representa el estado actual del sistema de red
 type NetworkState struct {
-	Connectivity  ConnectivityStatus
-	ActiveSSID    string
-	ActiveDevice  string
-	ActiveType    string // wifi, ethernet, tun, bridge
+	Connectivity   ConnectivityStatus
+	ActiveSSID     string
+	ActiveDevice   string
+	ActiveType     string // wifi, ethernet, tun, bridge
 	SignalStrength int    // 0-100
-	IPAddress     string
-	Gateway       string
-	DNSServers    []string
-	Speed         string // ej: "866.7 MBit/s"
-	IsVPNActive   bool
-	VPNName       string
+	IPAddress      string
+	Gateway        string
+	DNSServers     []string
+	Speed          string // ej: "866.7 MBit/s"
+	IsVPNActive    bool
+	VPNName        string
 }
 
 type ConnectivityStatus int
@@ -89,20 +89,20 @@ type WiFiNetwork struct {
 
 // Connection representa una conexión guardada en NetworkManager
 type Connection struct {
-	Name       string
-	UUID       string
-	Type       string // wifi, ethernet, vpn, bridge, tun
-	Device     string
+	Name        string
+	UUID        string
+	Type        string // wifi, ethernet, vpn, bridge, tun
+	Device      string
 	Autoconnect bool
-	Active     bool
+	Active      bool
 }
 
 // VPNConnection representa una conexión VPN
 type VPNConnection struct {
-	Name       string
-	UUID       string
-	Type       string // openvpn, wireguard, l2tp, sstp, etc
-	Active     bool
+	Name        string
+	UUID        string
+	Type        string // openvpn, wireguard, l2tp, sstp, etc
+	Active      bool
 	Autoconnect bool
 }
 

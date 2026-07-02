@@ -11,7 +11,7 @@ func (c *NmcliClient) GetConnectionPassword(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Formato: 802-11-wireless-security.psk:password
+
 	parts := strings.SplitN(out, ":", 2)
 	if len(parts) == 2 {
 		return parts[1], nil
