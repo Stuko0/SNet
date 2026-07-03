@@ -141,7 +141,7 @@ func (m DashboardModel) View() string {
 	content += fmt.Sprintf("%s  %s\n", statusIcon, theme.ValueStyle.Render(statusText))
 	content += "\n"
 
-	if state.Connectivity == network.ConnectivityFull || state.Connectivity == network.ConnectivityLimited {
+	if state.Connectivity == network.ConnectivityFull || state.Connectivity == network.ConnectivityLimited || state.ActiveSSID != "" {
 		content += theme.LabelStyle.Render("Red activa:") + " " +
 			theme.ValueStyle.Render(state.ActiveSSID) + signalBars + "\n"
 		content += theme.LabelStyle.Render("Tipo:") + " " +

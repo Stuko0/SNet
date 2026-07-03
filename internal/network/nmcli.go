@@ -43,7 +43,7 @@ func (c *NmcliClient) GetGeneralStatus() string {
 
 // GetConnectivity retorna el estado de conectividad
 func (c *NmcliClient) GetConnectivity() ConnectivityStatus {
-	out, err := runCmd("general", "connectivity")
+	out, err := runCmd("networking", "connectivity")
 	if err != nil {
 		return ConnectivityUnknown
 	}
