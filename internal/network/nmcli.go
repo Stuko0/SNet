@@ -67,7 +67,7 @@ func (c *NmcliClient) GetActiveConnection() (*NetworkState, error) {
 		Connectivity: c.GetConnectivity(),
 	}
 
-	out, err := runCmd("-t", "-f", "DEVICE,TYPE,CONNECTION", "device", "status")
+	out, err := runCmd("-t", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active")
 	if err != nil {
 		return state, err
 	}
@@ -77,18 +77,20 @@ func (c *NmcliClient) GetActiveConnection() (*NetworkState, error) {
 		if len(parts) < 3 {
 			continue
 		}
-		device, iftype, conn := parts[0], parts[1], parts[2]
-		if conn == "" || conn == "--" {
-			continue
-		}
-		if iftype == "wifi" || iftype == "ethernet" {
-			state.ActiveDevice = device
-			state.ActiveType = iftype
-			state.ActiveSSID = conn
-		}
-		if iftype == "tun" {
+		name, iftype, device := parts[0], parts[1], parts[2]
+		
+		if isVPNSection(iftype) {
 			state.IsVPNActive = true
-			state.VPNName = conn
+			state.VPNName = name
+		} else if iftype == "802-11-wireless" || iftype == "802-3-ethernet" || iftype == "wifi" || iftype == "ethernet" {
+			// Some nmcli versions report wifi/ethernet, others 802-11-wireless/802-3-ethernet
+			state.ActiveDevice = device
+			if iftype == "802-11-wireless" || iftype == "wifi" {
+				state.ActiveType = "wifi"
+			} else {
+				state.ActiveType = "ethernet"
+			}
+			state.ActiveSSID = name
 		}
 	}
 
@@ -264,7 +266,7 @@ func (c *NmcliClient) GetVPNs() ([]VPNConnection, error) {
 }
 
 func isVPNSection(t string) bool {
-	vpnTypes := []string{"vpn", "openvpn", "wireguard", "l2tp", "sstp", "pptp"}
+	vpnTypes := []string{"vpn", "openvpn", "wireguard", "l2tp", "sstp", "pptp", "tun"}
 	for _, vt := range vpnTypes {
 		if t == vt {
 			return true
