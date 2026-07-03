@@ -118,7 +118,7 @@ func (m WifiListModel) Update(msg tea.Msg) (WifiListModel, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 
-	case refreshMsg:
+	case RefreshMsg:
 		m.state = wifiLoading
 		m.toast = ""
 		m.toastErr = nil

@@ -163,7 +163,7 @@ func (m VPNListModel) Update(msg tea.Msg) (VPNListModel, tea.Cmd) {
 		}
 		return m, nil
 
-	case refreshMsg:
+	case RefreshMsg:
 		m.state = vpnLoading
 		m.toast = ""
 		return m, tea.Batch(m.spinner.Tick, fetchVPNs)

@@ -139,7 +139,7 @@ func (m HotspotModel) Update(msg tea.Msg) (HotspotModel, tea.Cmd) {
 		}
 		return m, nil
 
-	case refreshMsg:
+	case RefreshMsg:
 		m.state = hotspotScanning
 		m.toast = ""
 		return m, tea.Batch(m.spinner.Tick, fetchHotspotStatus)

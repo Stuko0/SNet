@@ -136,7 +136,7 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 		}
 		return m, nil
 
-	case refreshMsg:
+	case RefreshMsg:
 		m.state = savedLoading
 		m.toast = ""
 		m.toastErr = nil

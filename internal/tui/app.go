@@ -121,22 +121,52 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Pasar mensaje a la vista activa
-	var cmd tea.Cmd
-	switch m.activeTab {
-	case 0:
-		m.dashboard, cmd = m.dashboard.Update(msg)
-	case 1:
-		m.wifiList, cmd = m.wifiList.Update(msg)
-	case 2:
-		m.saved, cmd = m.saved.Update(msg)
-	case 3:
-		m.vpnList, cmd = m.vpnList.Update(msg)
-	case 4:
-		m.hotspot, cmd = m.hotspot.Update(msg)
+	var cmds []tea.Cmd
+
+	// Mensajes locales: solo a la vista activa
+	isLocal := false
+	switch msg.(type) {
+	case tea.KeyMsg, views.RefreshMsg:
+		isLocal = true
 	}
 
-	return m, cmd
+	if isLocal {
+		var cmd tea.Cmd
+		switch m.activeTab {
+		case 0:
+			m.dashboard, cmd = m.dashboard.Update(msg)
+		case 1:
+			m.wifiList, cmd = m.wifiList.Update(msg)
+		case 2:
+			m.saved, cmd = m.saved.Update(msg)
+		case 3:
+			m.vpnList, cmd = m.vpnList.Update(msg)
+		case 4:
+			m.hotspot, cmd = m.hotspot.Update(msg)
+		}
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	} else {
+		// Mensajes globales (resultados en segundo plano, spinners): a todas las vistas
+		var cmd tea.Cmd
+		m.dashboard, cmd = m.dashboard.Update(msg)
+		if cmd != nil { cmds = append(cmds, cmd) }
+		
+		m.wifiList, cmd = m.wifiList.Update(msg)
+		if cmd != nil { cmds = append(cmds, cmd) }
+		
+		m.saved, cmd = m.saved.Update(msg)
+		if cmd != nil { cmds = append(cmds, cmd) }
+		
+		m.vpnList, cmd = m.vpnList.Update(msg)
+		if cmd != nil { cmds = append(cmds, cmd) }
+		
+		m.hotspot, cmd = m.hotspot.Update(msg)
+		if cmd != nil { cmds = append(cmds, cmd) }
+	}
+
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) View() string {

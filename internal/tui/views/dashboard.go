@@ -47,10 +47,10 @@ func fetchState() tea.Msg {
 	return stateMsg{state: state, err: err}
 }
 
-type refreshMsg struct{}
+type RefreshMsg struct{}
 
 func RefreshCmd() tea.Msg {
-	return refreshMsg{}
+	return RefreshMsg{}
 }
 
 func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
@@ -65,7 +65,7 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 		}
 		return m, nil
 
-	case refreshMsg:
+	case RefreshMsg:
 		m.loading = true
 		return m, fetchState
 
