@@ -4,17 +4,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Colores primarios
+// Colores primarios (Rosé Pine Dawn/Moon)
 var (
-	ColorPrimary   = lipgloss.AdaptiveColor{Light: "#2563EB", Dark: "#60A5FA"} // Azul
-	ColorSecondary = lipgloss.AdaptiveColor{Light: "#059669", Dark: "#34D399"} // Verde
-	ColorDanger    = lipgloss.AdaptiveColor{Light: "#DC2626", Dark: "#F87171"} // Rojo
-	ColorWarning   = lipgloss.AdaptiveColor{Light: "#D97706", Dark: "#FBBF24"} // Amarillo
-	ColorMuted     = lipgloss.AdaptiveColor{Light: "#6B7280", Dark: "#9CA3AF"} // Gris
-	ColorText      = lipgloss.AdaptiveColor{Light: "#1F2937", Dark: "#F3F4F6"} // Texto
-	ColorSubtle    = lipgloss.AdaptiveColor{Light: "#9CA3AF", Dark: "#4B5563"} // Texto sutil
-	ColorSurface   = lipgloss.AdaptiveColor{Light: "#F3F4F6", Dark: "#1F2937"} // Fondo tarjetas
-	ColorBorder    = lipgloss.AdaptiveColor{Light: "#D1D5DB", Dark: "#374151"} // Bordes
+	ColorPrimary   = lipgloss.AdaptiveColor{Light: "#907aa9", Dark: "#c4a7e7"} // Iris
+	ColorSecondary = lipgloss.AdaptiveColor{Light: "#56949f", Dark: "#9ccfd8"} // Foam (Verde/Cyan pastel)
+	ColorDanger    = lipgloss.AdaptiveColor{Light: "#b4637a", Dark: "#eb6f92"} // Love (Rojo/Rosa)
+	ColorWarning   = lipgloss.AdaptiveColor{Light: "#ea9d34", Dark: "#f6c177"} // Gold (Amarillo)
+	ColorMuted     = lipgloss.AdaptiveColor{Light: "#9893a5", Dark: "#6e6a86"} // Muted
+	ColorText      = lipgloss.AdaptiveColor{Light: "#575279", Dark: "#e0def4"} // Text
+	ColorSubtle    = lipgloss.AdaptiveColor{Light: "#797593", Dark: "#908caa"} // Subtle
+	ColorSurface   = lipgloss.AdaptiveColor{Light: "#fffaf3", Dark: "#2a273f"} // Surface
+	ColorBorder    = lipgloss.AdaptiveColor{Light: "#f2e9e1", Dark: "#393552"} // Overlay
 )
 
 // Estilos globales
@@ -38,19 +38,9 @@ var (
 
 	ActiveTabStyle = lipgloss.NewStyle().
 			Padding(0, 2).
-			Foreground(ColorPrimary).
-			Border(lipgloss.Border{
-			Top:         "─",
-			Bottom:      " ",
-			Left:        "│",
-			Right:       "│",
-			TopLeft:     "╭",
-			TopRight:    "╮",
-			BottomLeft:  "│",
-			BottomRight: "│",
-		}, false).
-		BorderForeground(ColorPrimary).
-		Bold(true)
+			Foreground(lipgloss.AdaptiveColor{Light: "#faf4ed", Dark: "#232136"}).
+			Background(ColorPrimary).
+			Bold(true)
 
 	TabSeparator = lipgloss.NewStyle().
 			Foreground(ColorBorder).
@@ -73,8 +63,9 @@ var (
 
 	// Tarjetas / paneles
 	CardStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
+			Border(lipgloss.ThickBorder()).
 			BorderForeground(ColorBorder).
+			Background(ColorSurface).
 			Padding(1, 2).
 			MarginBottom(1)
 
@@ -134,9 +125,9 @@ var (
 
 // TabTitles son los nombres de las pestañas
 var TabTitles = []string{
-	" 📡 Estado ",
-	" 📶 Wi-Fi  ",
-	" 💾 Guardadas ",
-	" 🔒 VPN   ",
-	" 🔥 Hotspot ",
+	" 󰣺 Estado ",
+	" 󰤨 Wi-Fi  ",
+	" 󰆓 Guardadas ",
+	" 󰒄 VPN   ",
+	" 󰈀 Hotspot ",
 }

@@ -305,21 +305,21 @@ func (m HotspotModel) updateFocusedField(msg tea.KeyMsg) (HotspotModel, tea.Cmd)
 func (m HotspotModel) View() string {
 	if m.state == hotspotScanning {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔥 Hotspot") + "\n\n" +
+			theme.CardTitleStyle.Render("󰈀 Hotspot") + "\n\n" +
 				m.spinner.View() + " Verificando estado...",
 		)
 	}
 
 	if m.state == hotspotStarting {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔥 Hotspot") + "\n\n" +
+			theme.CardTitleStyle.Render("󰈀 Hotspot") + "\n\n" +
 				m.spinner.View() + " Iniciando hotspot...",
 		)
 	}
 
 	if m.state == hotspotStopping {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔥 Hotspot") + "\n\n" +
+			theme.CardTitleStyle.Render("󰈀 Hotspot") + "\n\n" +
 				m.spinner.View() + " Deteniendo hotspot...",
 		)
 	}
@@ -328,7 +328,7 @@ func (m HotspotModel) View() string {
 }
 
 func (m HotspotModel) renderContent() string {
-	title := theme.CardTitleStyle.Render("🔥 Hotspot")
+	title := theme.CardTitleStyle.Render("󰈀 Hotspot")
 
 	if m.status != nil && m.status.Active {
 		statusBox := lipgloss.NewStyle().
@@ -394,13 +394,13 @@ func (m HotspotModel) renderContent() string {
 		Background(theme.ColorSecondary).
 		Foreground(lipgloss.Color("#FFFFFF")).
 		Padding(0, 3).
-		Render("🔥 Iniciar Hotspot")
+		Render("󰈀 Iniciar Hotspot")
 	if m.focusField == 3 {
 		startBtn = lipgloss.NewStyle().
 			Background(theme.ColorPrimary).
 			Foreground(lipgloss.Color("#FFFFFF")).
 			Padding(0, 3).
-			Render("🔥 Iniciar Hotspot")
+			Render("󰈀 Iniciar Hotspot")
 	}
 	fields = append(fields, startLabel+startBtn)
 

@@ -278,14 +278,14 @@ func (m SavedModel) View() string {
 			label = "Cargando conexiones..."
 		}
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("💾 Conexiones Guardadas") + "\n\n" +
+			theme.CardTitleStyle.Render("󰆓 Conexiones Guardadas") + "\n\n" +
 				m.spinner.View() + " " + label,
 		)
 	}
 
 	if m.state == savedConnecting {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("💾 Conexiones Guardadas") + "\n\n" +
+			theme.CardTitleStyle.Render("󰆓 Conexiones Guardadas") + "\n\n" +
 				m.spinner.View() + " Conectando a " + m.getSelectedName() + "...",
 		)
 	}
@@ -312,7 +312,7 @@ func (m SavedModel) View() string {
 }
 
 func (m SavedModel) renderTableView() string {
-	title := theme.CardTitleStyle.Render("💾 Conexiones Guardadas")
+	title := theme.CardTitleStyle.Render("󰆓 Conexiones Guardadas")
 	stats := fmt.Sprintf("  %d conexiones    ", len(m.conns))
 
 	var body string
@@ -424,13 +424,13 @@ func buildConnTable(conns []network.Connection) table.Model {
 func connTypeIcon(t string) string {
 	switch t {
 	case "wifi":
-		return "📶 WiFi"
+		return "󰤨 WiFi"
 	case "ethernet":
 		return "🔌 Eth"
 	case "vpn", "openvpn":
-		return "🔒 VPN"
+		return "󰒄 VPN"
 	case "wireguard":
-		return "🔒 WG"
+		return "󰒄 WG"
 	case "bridge":
 		return "🔗 Br"
 	default:

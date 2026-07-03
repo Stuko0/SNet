@@ -219,7 +219,7 @@ func (m *EditorModel) updateFocus() {
 func (m EditorModel) View() string {
 	if m.state == editorSaving {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("💾 Editando: "+m.connName) + "\n\n" +
+			theme.CardTitleStyle.Render("󰆓 Editando: "+m.connName) + "\n\n" +
 				"Guardando cambios...",
 		)
 	}

@@ -93,15 +93,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case keyMatches(msg, Keys.Tab):
 			m.activeTab = (m.activeTab + 1) % len(theme.TabTitles)
-			return m, nil
+			return m, func() tea.Msg { return views.RefreshMsg{} }
 
 		case keyMatches(msg, Keys.ShiftTab):
 			m.activeTab = (m.activeTab - 1 + len(theme.TabTitles)) % len(theme.TabTitles)
-			return m, nil
+			return m, func() tea.Msg { return views.RefreshMsg{} }
 
 		case keyMatches(msg, Keys.Refresh):
 			return m, func() tea.Msg {
-				return views.RefreshCmd()
+				return views.RefreshMsg{}
 			}
 		}
 
@@ -115,9 +115,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.editor = &updatedEditor
 			if m.editor.IsDone() && keyMatches(msg, Keys.Escape) {
 				m.editor = nil
-				return m, func() tea.Msg { return views.RefreshCmd() }
+				return m, func() tea.Msg { return views.RefreshMsg{} } // Actualizado a RefreshMsg
 			}
 			return m, cmd
+		}
+
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
+			if msg.Y == 1 { // Click en la fila de pestañas (Y=1 debido al header en Y=0)
+				x := 1 // Padding izquierdo de AppStyle
+				for i, t := range theme.TabTitles {
+					var w int
+					if i == m.activeTab {
+						w = lipgloss.Width(theme.ActiveTabStyle.Render(t))
+					} else {
+						w = lipgloss.Width(theme.TabStyle.Render(t))
+					}
+					if msg.X >= x && msg.X < x+w {
+						if m.activeTab != i {
+							m.activeTab = i
+							return m, func() tea.Msg { return views.RefreshMsg{} }
+						}
+						break
+					}
+					x += w
+				}
+			}
 		}
 	}
 
@@ -173,11 +196,11 @@ func (m Model) View() string {
 	if !m.ready {
 		return lipgloss.NewStyle().Width(80).Height(24).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render("Inicializando nmtui...")
+			Render("Inicializando SNet...")
 	}
 
 	header := lipgloss.JoinHorizontal(lipgloss.Center,
-		theme.LogoStyle.Render("📡 nmtui"),
+		theme.LogoStyle.Render("󰣺 SNet"),
 		theme.TitleStyle.Render("v0.1.0"),
 		lipgloss.NewStyle().Width(m.width-18).Render(""),
 		theme.LabelStyle.Render("NetworkManager TUI"),
@@ -229,7 +252,7 @@ func (m Model) View() string {
 			Width(40).
 			Render(
 				lipgloss.JoinVertical(lipgloss.Center,
-					lipgloss.NewStyle().Foreground(theme.ColorDanger).Bold(true).Render("¿Salir de nmtui?"),
+					lipgloss.NewStyle().Foreground(theme.ColorDanger).Bold(true).Render("¿Salir de SNet?"),
 					"",
 					"Presiona "+keyStyle("Ctrl+q")+" para confirmar",
 					"o cualquier otra tecla para cancelar.",
@@ -340,7 +363,7 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 func renderHelp(width, height int) string {
 	helpContent := theme.HelpStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left,
-			lipgloss.NewStyle().Foreground(theme.ColorPrimary).Bold(true).Render("Ayuda de nmtui"),
+			lipgloss.NewStyle().Foreground(theme.ColorPrimary).Bold(true).Render("Ayuda de SNet"),
 			"",
 			"  Navegación:",
 			helpRow("Tab / Shift+Tab", "Cambiar entre vistas"),

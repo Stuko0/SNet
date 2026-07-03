@@ -270,7 +270,7 @@ func (m WifiListModel) getSelectedSSID() string {
 func (m WifiListModel) View() string {
 	if m.state == wifiLoading && len(m.networks) == 0 {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("📶 Redes Wi-Fi") + "\n\n" +
+			theme.CardTitleStyle.Render("󰤨 Redes Wi-Fi") + "\n\n" +
 				m.spinner.View() + " Escaneando redes...",
 		)
 	}
@@ -278,7 +278,7 @@ func (m WifiListModel) View() string {
 	if m.state == wifiConnecting {
 		ssid := m.getSelectedSSID()
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("📶 Redes Wi-Fi") + "\n\n" +
+			theme.CardTitleStyle.Render("󰤨 Redes Wi-Fi") + "\n\n" +
 				m.spinner.View() + " Conectando a " + ssid + "...",
 		)
 	}
@@ -297,7 +297,7 @@ func (m WifiListModel) View() string {
 }
 
 func (m WifiListModel) renderTableView() string {
-	cardTitle := theme.CardTitleStyle.Render("📶 Redes Wi-Fi")
+	cardTitle := theme.CardTitleStyle.Render("󰤨 Redes Wi-Fi")
 
 	stats := fmt.Sprintf("  %d redes encontradas    ", len(m.networks))
 
