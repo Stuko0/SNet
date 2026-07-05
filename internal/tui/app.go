@@ -51,6 +51,14 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// ==========================================================
+	// Editor overlay: intercept ALL messages while active
+	// (spinner ticks, settings load results, key presses, etc.)
+	// ==========================================================
+	if m.editor != nil {
+		return m.updateEditor(msg)
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -60,8 +68,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case views.EditConnectionMsg:
 		editor := views.NewEditor(msg.Name, msg.Type)
+		loadCmd := editor.LoadCmd()
 		m.editor = &editor
-		return m, nil
+		return m, loadCmd
 
 	case tea.KeyMsg:
 		if m.showHelp {
@@ -93,47 +102,117 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case keyMatches(msg, Keys.Tab):
 			m.activeTab = (m.activeTab + 1) % len(theme.TabTitles)
-			return m, nil
+			return m, func() tea.Msg { return views.RefreshMsg{} }
 
 		case keyMatches(msg, Keys.ShiftTab):
 			m.activeTab = (m.activeTab - 1 + len(theme.TabTitles)) % len(theme.TabTitles)
-			return m, nil
+			return m, func() tea.Msg { return views.RefreshMsg{} }
 
 		case keyMatches(msg, Keys.Refresh):
 			return m, func() tea.Msg {
-				return views.RefreshCmd()
+				return views.RefreshMsg{}
 			}
 		}
 
-		if m.editor != nil {
-			if keyMatches(msg, Keys.Escape) && !m.editor.IsDone() {
-				m.editor = nil
-				return m, nil
+	case tea.MouseMsg:
+		if msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
+			if msg.Y == 1 { // Click en la fila de pestañas (Y=1 debido al header en Y=0)
+				x := 1 // Padding izquierdo de AppStyle
+				for i, t := range theme.TabTitles {
+					var w int
+					if i == m.activeTab {
+						w = lipgloss.Width(theme.ActiveTabStyle.Render(t))
+					} else {
+						w = lipgloss.Width(theme.TabStyle.Render(t))
+					}
+					if msg.X >= x && msg.X < x+w {
+						if m.activeTab != i {
+							m.activeTab = i
+							return m, func() tea.Msg { return views.RefreshMsg{} }
+						}
+						break
+					}
+					x += w
+				}
 			}
-			var cmd tea.Cmd
-			updatedEditor, cmd := m.editor.Update(msg)
-			m.editor = &updatedEditor
-			if m.editor.IsDone() && keyMatches(msg, Keys.Escape) {
-				m.editor = nil
-				return m, func() tea.Msg { return views.RefreshCmd() }
-			}
-			return m, cmd
 		}
 	}
 
-	// Pasar mensaje a la vista activa
-	var cmd tea.Cmd
-	switch m.activeTab {
-	case 0:
+	var cmds []tea.Cmd
+
+	// Mensajes locales: solo a la vista activa
+	isLocal := false
+	switch msg.(type) {
+	case tea.KeyMsg, views.RefreshMsg:
+		isLocal = true
+	}
+
+	if isLocal {
+		var cmd tea.Cmd
+		switch m.activeTab {
+		case 0:
+			m.dashboard, cmd = m.dashboard.Update(msg)
+		case 1:
+			m.wifiList, cmd = m.wifiList.Update(msg)
+		case 2:
+			m.saved, cmd = m.saved.Update(msg)
+		case 3:
+			m.vpnList, cmd = m.vpnList.Update(msg)
+		case 4:
+			m.hotspot, cmd = m.hotspot.Update(msg)
+		}
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	} else {
+		// Mensajes globales (resultados en segundo plano, spinners): a todas las vistas
+		var cmd tea.Cmd
 		m.dashboard, cmd = m.dashboard.Update(msg)
-	case 1:
+		if cmd != nil { cmds = append(cmds, cmd) }
+
 		m.wifiList, cmd = m.wifiList.Update(msg)
-	case 2:
+		if cmd != nil { cmds = append(cmds, cmd) }
+
 		m.saved, cmd = m.saved.Update(msg)
-	case 3:
+		if cmd != nil { cmds = append(cmds, cmd) }
+
 		m.vpnList, cmd = m.vpnList.Update(msg)
-	case 4:
+		if cmd != nil { cmds = append(cmds, cmd) }
+
 		m.hotspot, cmd = m.hotspot.Update(msg)
+		if cmd != nil { cmds = append(cmds, cmd) }
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+// updateEditor maneja TODOS los mensajes mientras el editor overlay está activo
+func (m Model) updateEditor(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Escape sin cambios → cerrar editor
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		if keyMatches(keyMsg, Keys.Escape) && !m.editor.IsDone() {
+			m.editor = nil
+			return m, nil
+		}
+		// Quit desde el editor
+		if keyMatches(keyMsg, Keys.Quit) {
+			m.quitting = true
+			return m, nil
+		}
+	}
+
+	// Pasar el mensaje al editor
+	var cmd tea.Cmd
+	updatedEditor, cmd := m.editor.Update(msg)
+	m.editor = &updatedEditor
+
+	// Si el editor terminó (save ok/error) y fue la última tecla Escape → cerrar
+	if m.editor.IsDone() {
+		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMatches(keyMsg, Keys.Escape) {
+			m.editor = nil
+			return m, func() tea.Msg { return views.RefreshMsg{} }
+		}
+		// cualquier otra tecla: volver a editing (descartar toast)
 	}
 
 	return m, cmd
@@ -143,11 +222,11 @@ func (m Model) View() string {
 	if !m.ready {
 		return lipgloss.NewStyle().Width(80).Height(24).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render("Inicializando nmtui...")
+			Render("Inicializando SNet...")
 	}
 
 	header := lipgloss.JoinHorizontal(lipgloss.Center,
-		theme.LogoStyle.Render("📡 nmtui"),
+		theme.LogoStyle.Render("󰣺 SNet"),
 		theme.TitleStyle.Render("v0.1.0"),
 		lipgloss.NewStyle().Width(m.width-18).Render(""),
 		theme.LabelStyle.Render("NetworkManager TUI"),
@@ -199,7 +278,7 @@ func (m Model) View() string {
 			Width(40).
 			Render(
 				lipgloss.JoinVertical(lipgloss.Center,
-					lipgloss.NewStyle().Foreground(theme.ColorDanger).Bold(true).Render("¿Salir de nmtui?"),
+					lipgloss.NewStyle().Foreground(theme.ColorDanger).Bold(true).Render("¿Salir de SNet?"),
 					"",
 					"Presiona "+keyStyle("Ctrl+q")+" para confirmar",
 					"o cualquier otra tecla para cancelar.",
@@ -266,6 +345,7 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 			{"↑/↓", "Navegar"},
 			{"Enter", "Conectar"},
 			{"d", "Eliminar"},
+			{"e", "Editar"},
 			{"p", "Password"},
 			{"r", "Refrescar"},
 			{"?", "Ayuda"},
@@ -274,6 +354,7 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 		keys = []struct{ key, desc string }{
 			{"↑/↓", "Navegar"},
 			{"Enter", "Conectar/Desconectar"},
+			{"e", "Editar"},
 			{"Ctrl+n", "Nueva VPN"},
 			{"r", "Refrescar"},
 			{"?", "Ayuda"},
@@ -310,7 +391,7 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 func renderHelp(width, height int) string {
 	helpContent := theme.HelpStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left,
-			lipgloss.NewStyle().Foreground(theme.ColorPrimary).Bold(true).Render("Ayuda de nmtui"),
+			lipgloss.NewStyle().Foreground(theme.ColorPrimary).Bold(true).Render("Ayuda de SNet"),
 			"",
 			"  Navegación:",
 			helpRow("Tab / Shift+Tab", "Cambiar entre vistas"),

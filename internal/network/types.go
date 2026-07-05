@@ -46,8 +46,7 @@ type NetworkState struct {
 	Gateway        string
 	DNSServers     []string
 	Speed          string // ej: "866.7 MBit/s"
-	IsVPNActive    bool
-	VPNName        string
+	ActiveVPNs     []string
 }
 
 type ConnectivityStatus int

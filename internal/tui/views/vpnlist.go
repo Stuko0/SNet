@@ -163,7 +163,7 @@ func (m VPNListModel) Update(msg tea.Msg) (VPNListModel, tea.Cmd) {
 		}
 		return m, nil
 
-	case refreshMsg:
+	case RefreshMsg:
 		m.state = vpnLoading
 		m.toast = ""
 		return m, tea.Batch(m.spinner.Tick, fetchVPNs)
@@ -217,6 +217,15 @@ func (m VPNListModel) handleIdleKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd) {
 	case "ctrl+n":
 		m.state = vpnAddType
 		return m, nil
+
+	case "e":
+		if sel == "" {
+			return m, nil
+		}
+		vpnType := m.getSelectedType()
+		return m, func() tea.Msg {
+			return EditConnectionMsg{Name: sel, Type: vpnType}
+		}
 
 	case "r":
 		m.state = vpnLoading
@@ -404,6 +413,16 @@ func (m VPNListModel) getSelectedName() string {
 	return row[0]
 }
 
+func (m VPNListModel) getSelectedType() string {
+	selName := m.getSelectedName()
+	for _, v := range m.vpns {
+		if v.Name == selName {
+			return v.Type
+		}
+	}
+	return ""
+}
+
 func (m VPNListModel) isActive(name string) bool {
 	for _, v := range m.vpns {
 		if v.Name == name && v.Active {
@@ -417,17 +436,17 @@ func (m VPNListModel) View() string {
 	switch m.state {
 	case vpnLoading:
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔒 VPN") + "\n\n" +
+			theme.CardTitleStyle.Render("󰒄 VPN") + "\n\n" +
 				m.spinner.View() + " Cargando VPNs...",
 		)
 	case vpnConnecting:
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔒 VPN") + "\n\n" +
+			theme.CardTitleStyle.Render("󰒄 VPN") + "\n\n" +
 				m.spinner.View() + " Conectando VPN...",
 		)
 	case vpnDisconnecting:
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("🔒 VPN") + "\n\n" +
+			theme.CardTitleStyle.Render("󰒄 VPN") + "\n\n" +
 				m.spinner.View() + " Desconectando VPN...",
 		)
 	case vpnAddType:
@@ -444,7 +463,7 @@ func (m VPNListModel) View() string {
 }
 
 func (m VPNListModel) renderTableView() string {
-	title := theme.CardTitleStyle.Render("🔒 VPN")
+	title := theme.CardTitleStyle.Render("󰒄 VPN")
 	stats := fmt.Sprintf("  %d VPNs configuradas", len(m.vpns))
 
 	var body string
@@ -467,7 +486,7 @@ func (m VPNListModel) renderTableView() string {
 }
 
 func (m VPNListModel) renderAddType() string {
-	title := theme.CardTitleStyle.Render("🔒 Nueva VPN")
+	title := theme.CardTitleStyle.Render("󰒄 Nueva VPN")
 
 	types := []struct {
 		key  string
@@ -500,7 +519,7 @@ func (m VPNListModel) renderAddType() string {
 
 func (m VPNListModel) renderAddConfig() string {
 	title := theme.CardTitleStyle.Render(
-		fmt.Sprintf("🔒 Configurar %s", m.addType),
+		fmt.Sprintf("󰒄 Configurar %s", m.addType),
 	)
 
 	var fields []string

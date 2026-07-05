@@ -60,6 +60,7 @@ type connActionMsg struct {
 	action string // "connect", "delete", "password"
 	name   string
 	err    error
+	pwd    string // contraseña recuperada (action == "password")
 }
 
 func fetchConnections() tea.Msg {
@@ -82,7 +83,7 @@ func fetchPassword(name string) tea.Msg {
 	if err != nil || pwd == "" {
 		return connActionMsg{action: "password", name: name, err: fmt.Errorf("sin contraseña o no es WiFi")}
 	}
-	return connActionMsg{action: "password", name: name, err: nil}
+	return connActionMsg{action: "password", name: name, pwd: pwd, err: nil}
 }
 
 func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
@@ -133,10 +134,11 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 				m.password = ""
 				return m, nil
 			}
+			m.password = msg.pwd
 		}
 		return m, nil
 
-	case refreshMsg:
+	case RefreshMsg:
 		m.state = savedLoading
 		m.toast = ""
 		m.toastErr = nil
@@ -274,18 +276,15 @@ type EditConnectionMsg struct {
 func (m SavedModel) View() string {
 	if m.state == savedLoading {
 		label := "Cargando conexiones..."
-		if m.password == "" && m.state == savedLoading {
-			label = "Cargando conexiones..."
-		}
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("💾 Conexiones Guardadas") + "\n\n" +
+			theme.CardTitleStyle.Render("󰆓 Conexiones Guardadas") + "\n\n" +
 				m.spinner.View() + " " + label,
 		)
 	}
 
 	if m.state == savedConnecting {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("💾 Conexiones Guardadas") + "\n\n" +
+			theme.CardTitleStyle.Render("󰆓 Conexiones Guardadas") + "\n\n" +
 				m.spinner.View() + " Conectando a " + m.getSelectedName() + "...",
 		)
 	}
@@ -295,11 +294,26 @@ func (m SavedModel) View() string {
 	}
 
 	if m.state == savedShowingPwd {
-		if m.password != "" {
-			return m.renderTableView()
-		}
-
-		return m.renderTableView()
+		view := m.renderTableView()
+		pwdBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.ColorPrimary).
+			Padding(1, 2).
+			Width(50).
+			Render(
+				lipgloss.JoinVertical(lipgloss.Center,
+					lipgloss.NewStyle().Foreground(theme.ColorPrimary).Bold(true).Render("🔑 Contraseña de " + m.getSelectedName()),
+					"",
+					lipgloss.NewStyle().Foreground(theme.ColorText).Render(m.password),
+					"",
+					lipgloss.NewStyle().Foreground(theme.ColorSubtle).Render("Presiona cualquier tecla para cerrar"),
+				),
+			)
+		return lipgloss.JoinVertical(lipgloss.Top,
+			view,
+			"",
+			pwdBox,
+		)
 	}
 
 	if m.state == savedDone || m.state == savedError {
@@ -312,7 +326,7 @@ func (m SavedModel) View() string {
 }
 
 func (m SavedModel) renderTableView() string {
-	title := theme.CardTitleStyle.Render("💾 Conexiones Guardadas")
+	title := theme.CardTitleStyle.Render("󰆓 Conexiones Guardadas")
 	stats := fmt.Sprintf("  %d conexiones    ", len(m.conns))
 
 	var body string
@@ -323,7 +337,7 @@ func (m SavedModel) renderTableView() string {
 	}
 
 	help := lipgloss.NewStyle().Foreground(theme.ColorSubtle).Render(
-		"  ↑/↓: Navegar  Enter: Conectar  d: Eliminar  p: Ver contraseña  r: Refrescar  ?: Ayuda",
+		"  ↑/↓: Navegar  Enter: Conectar  e: Editar  d: Eliminar  p: Ver contraseña  r: Refrescar  ?: Ayuda",
 	)
 
 	return theme.CardStyle.Render(
@@ -424,13 +438,13 @@ func buildConnTable(conns []network.Connection) table.Model {
 func connTypeIcon(t string) string {
 	switch t {
 	case "wifi":
-		return "📶 WiFi"
+		return "󰤨 WiFi"
 	case "ethernet":
 		return "🔌 Eth"
 	case "vpn", "openvpn":
-		return "🔒 VPN"
+		return "󰒄 VPN"
 	case "wireguard":
-		return "🔒 WG"
+		return "󰒄 WG"
 	case "bridge":
 		return "🔗 Br"
 	default:

@@ -118,7 +118,7 @@ func (m WifiListModel) Update(msg tea.Msg) (WifiListModel, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 
-	case refreshMsg:
+	case RefreshMsg:
 		m.state = wifiLoading
 		m.toast = ""
 		m.toastErr = nil
@@ -260,17 +260,17 @@ func (m WifiListModel) getSelectedSSID() string {
 	if len(m.table.Rows()) == 0 {
 		return ""
 	}
-	row := m.table.SelectedRow()
-	if len(row) == 0 {
+	idx := m.table.Cursor()
+	if idx < 0 || idx >= len(m.networks) {
 		return ""
 	}
-	return row[0]
+	return m.networks[idx].SSID
 }
 
 func (m WifiListModel) View() string {
 	if m.state == wifiLoading && len(m.networks) == 0 {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("📶 Redes Wi-Fi") + "\n\n" +
+			theme.CardTitleStyle.Render("󰤨 Redes Wi-Fi") + "\n\n" +
 				m.spinner.View() + " Escaneando redes...",
 		)
 	}
@@ -278,7 +278,7 @@ func (m WifiListModel) View() string {
 	if m.state == wifiConnecting {
 		ssid := m.getSelectedSSID()
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("📶 Redes Wi-Fi") + "\n\n" +
+			theme.CardTitleStyle.Render("󰤨 Redes Wi-Fi") + "\n\n" +
 				m.spinner.View() + " Conectando a " + ssid + "...",
 		)
 	}
@@ -297,7 +297,7 @@ func (m WifiListModel) View() string {
 }
 
 func (m WifiListModel) renderTableView() string {
-	cardTitle := theme.CardTitleStyle.Render("📶 Redes Wi-Fi")
+	cardTitle := theme.CardTitleStyle.Render("󰤨 Redes Wi-Fi")
 
 	stats := fmt.Sprintf("  %d redes encontradas    ", len(m.networks))
 

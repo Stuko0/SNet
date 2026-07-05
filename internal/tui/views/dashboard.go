@@ -47,10 +47,10 @@ func fetchState() tea.Msg {
 	return stateMsg{state: state, err: err}
 }
 
-type refreshMsg struct{}
+type RefreshMsg struct{}
 
 func RefreshCmd() tea.Msg {
-	return refreshMsg{}
+	return RefreshMsg{}
 }
 
 func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
@@ -65,7 +65,7 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 		}
 		return m, nil
 
-	case refreshMsg:
+	case RefreshMsg:
 		m.loading = true
 		return m, fetchState
 
@@ -82,14 +82,14 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 func (m DashboardModel) View() string {
 	if m.loading {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("📡 Estado de Red") + "\n\n" +
+			theme.CardTitleStyle.Render("󰣺 Estado de Red") + "\n\n" +
 				m.spinner.View() + " Obteniendo estado...",
 		)
 	}
 
 	if m.err != nil {
 		return theme.CardStyle.Render(
-			theme.CardTitleStyle.Render("📡 Estado de Red") + "\n\n" +
+			theme.CardTitleStyle.Render("󰣺 Estado de Red") + "\n\n" +
 				theme.ErrorStyle.Render("✗ Error al obtener estado: "+m.err.Error()),
 		)
 	}
@@ -141,7 +141,7 @@ func (m DashboardModel) View() string {
 	content += fmt.Sprintf("%s  %s\n", statusIcon, theme.ValueStyle.Render(statusText))
 	content += "\n"
 
-	if state.Connectivity == network.ConnectivityFull || state.Connectivity == network.ConnectivityLimited {
+	if state.Connectivity == network.ConnectivityFull || state.Connectivity == network.ConnectivityLimited || state.ActiveSSID != "" {
 		content += theme.LabelStyle.Render("Red activa:") + " " +
 			theme.ValueStyle.Render(state.ActiveSSID) + signalBars + "\n"
 		content += theme.LabelStyle.Render("Tipo:") + " " +
@@ -164,9 +164,13 @@ func (m DashboardModel) View() string {
 		content += theme.WarningStyle.Render("  No hay conexión activa") + "\n"
 	}
 
-	content += "\n" + theme.LabelStyle.Render("VPN activa:") + " "
-	if state.IsVPNActive {
-		content += theme.SuccessStyle.Render("● "+state.VPNName) + "\n"
+	content += "\n" + theme.LabelStyle.Render("VPN activas:") + " "
+	if len(state.ActiveVPNs) > 0 {
+		var vpnList []string
+		for _, vpn := range state.ActiveVPNs {
+			vpnList = append(vpnList, theme.SuccessStyle.Render("● "+vpn))
+		}
+		content += strings.Join(vpnList, ", ") + "\n"
 	} else {
 		content += theme.ValueStyle.Render("❌ Ninguna") + "\n"
 	}
@@ -175,7 +179,7 @@ func (m DashboardModel) View() string {
 		theme.ValueStyle.Render(state.ActiveDevice)
 
 	return theme.CardStyle.Render(
-		theme.CardTitleStyle.Render("📡 Estado de Red") + "\n" +
+		theme.CardTitleStyle.Render("󰣺 Estado de Red") + "\n" +
 			content,
 	)
 }
@@ -183,11 +187,11 @@ func (m DashboardModel) View() string {
 func deviceIcon(t string) string {
 	switch t {
 	case "wifi":
-		return "📶"
+		return "󰤨"
 	case "ethernet":
 		return "🔌"
 	case "tun":
-		return "🔒"
+		return "󰒄"
 	case "bridge":
 		return "🔗"
 	default:

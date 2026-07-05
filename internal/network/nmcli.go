@@ -43,7 +43,7 @@ func (c *NmcliClient) GetGeneralStatus() string {
 
 // GetConnectivity retorna el estado de conectividad
 func (c *NmcliClient) GetConnectivity() ConnectivityStatus {
-	out, err := runCmd("general", "connectivity")
+	out, err := runCmd("networking", "connectivity")
 	if err != nil {
 		return ConnectivityUnknown
 	}
@@ -67,7 +67,7 @@ func (c *NmcliClient) GetActiveConnection() (*NetworkState, error) {
 		Connectivity: c.GetConnectivity(),
 	}
 
-	out, err := runCmd("-t", "-f", "DEVICE,TYPE,CONNECTION", "device", "status")
+	out, err := runCmd("-t", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active")
 	if err != nil {
 		return state, err
 	}
@@ -77,18 +77,19 @@ func (c *NmcliClient) GetActiveConnection() (*NetworkState, error) {
 		if len(parts) < 3 {
 			continue
 		}
-		device, iftype, conn := parts[0], parts[1], parts[2]
-		if conn == "" || conn == "--" {
-			continue
-		}
-		if iftype == "wifi" || iftype == "ethernet" {
+		name, iftype, device := parts[0], parts[1], parts[2]
+		
+		if isVPNSection(iftype) {
+			state.ActiveVPNs = append(state.ActiveVPNs, name)
+		} else if iftype == "802-11-wireless" || iftype == "802-3-ethernet" || iftype == "wifi" || iftype == "ethernet" {
+			// Some nmcli versions report wifi/ethernet, others 802-11-wireless/802-3-ethernet
 			state.ActiveDevice = device
-			state.ActiveType = iftype
-			state.ActiveSSID = conn
-		}
-		if iftype == "tun" {
-			state.IsVPNActive = true
-			state.VPNName = conn
+			if iftype == "802-11-wireless" || iftype == "wifi" {
+				state.ActiveType = "wifi"
+			} else {
+				state.ActiveType = "ethernet"
+			}
+			state.ActiveSSID = name
 		}
 	}
 
@@ -264,7 +265,7 @@ func (c *NmcliClient) GetVPNs() ([]VPNConnection, error) {
 }
 
 func isVPNSection(t string) bool {
-	vpnTypes := []string{"vpn", "openvpn", "wireguard", "l2tp", "sstp", "pptp"}
+	vpnTypes := []string{"vpn", "openvpn", "wireguard", "l2tp", "sstp", "pptp", "tun"}
 	for _, vt := range vpnTypes {
 		if t == vt {
 			return true
@@ -309,6 +310,9 @@ func Disconnect(device string) error              { return DefaultClient.Disconn
 func DeleteConnection(name string) error          { return DefaultClient.DeleteConnection(name) }
 func GetConnectionPassword(name string) (string, error) {
 	return DefaultClient.GetConnectionPassword(name)
+}
+func GetConnectionSettings(name string, settings ...string) (map[string]string, error) {
+	return DefaultClient.GetConnectionSettings(name, settings...)
 }
 func ModifyConnection(name, setting, value string) error {
 	return DefaultClient.ModifyConnection(name, setting, value)
