@@ -218,6 +218,15 @@ func (m VPNListModel) handleIdleKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd) {
 		m.state = vpnAddType
 		return m, nil
 
+	case "e":
+		if sel == "" {
+			return m, nil
+		}
+		vpnType := m.getSelectedType()
+		return m, func() tea.Msg {
+			return EditConnectionMsg{Name: sel, Type: vpnType}
+		}
+
 	case "r":
 		m.state = vpnLoading
 		return m, tea.Batch(m.spinner.Tick, fetchVPNs)
@@ -402,6 +411,16 @@ func (m VPNListModel) getSelectedName() string {
 		return ""
 	}
 	return row[0]
+}
+
+func (m VPNListModel) getSelectedType() string {
+	selName := m.getSelectedName()
+	for _, v := range m.vpns {
+		if v.Name == selName {
+			return v.Type
+		}
+	}
+	return ""
 }
 
 func (m VPNListModel) isActive(name string) bool {

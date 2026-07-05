@@ -48,24 +48,20 @@ var (
 
 	// Barra de estado (footer)
 	FooterStyle = lipgloss.NewStyle().
-			Background(ColorPrimary).
-			Foreground(lipgloss.Color("#FFFFFF")).
+			Foreground(ColorPrimary).
 			Padding(0, 1)
 
 	FooterKeyStyle = lipgloss.NewStyle().
-			Background(ColorPrimary).
-			Foreground(lipgloss.Color("#FFFFFF")).
+			Foreground(ColorPrimary).
 			Bold(true)
 
 	FooterDescStyle = lipgloss.NewStyle().
-			Background(ColorPrimary).
-			Foreground(lipgloss.AdaptiveColor{Light: "#BFDBFE", Dark: "#1E3A5F"})
+			Foreground(ColorSubtle)
 
 	// Tarjetas / paneles
 	CardStyle = lipgloss.NewStyle().
 			Border(lipgloss.ThickBorder()).
 			BorderForeground(ColorBorder).
-			Background(ColorSurface).
 			Padding(1, 2).
 			MarginBottom(1)
 

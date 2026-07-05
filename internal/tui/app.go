@@ -327,6 +327,7 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 		keys = []struct{ key, desc string }{
 			{"↑/↓", "Navegar"},
 			{"Enter", "Conectar/Desconectar"},
+			{"e", "Editar"},
 			{"Ctrl+n", "Nueva VPN"},
 			{"r", "Refrescar"},
 			{"?", "Ayuda"},

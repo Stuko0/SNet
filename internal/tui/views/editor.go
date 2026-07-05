@@ -87,6 +87,55 @@ func buildFields(connType string) []Field {
 				Input:   newInput("MTU (ej: 1500)", false),
 			},
 		)
+	case "vpn", "openvpn":
+		fields = append(fields,
+			Field{
+				Label:   "Servidor",
+				Setting: "vpn.data",
+				Input:   newInput("Servidor (ej: vpn.example.com)", false),
+			},
+			Field{
+				Label:   "Puerto",
+				Setting: "vpn.data",
+				Input:   newInput("Puerto (ej: 1194)", false),
+			},
+			Field{
+				Label:   "Usuario",
+				Setting: "vpn.user-name",
+				Input:   newInput("Usuario VPN", false),
+			},
+			Field{
+				Label:   "Contraseña",
+				Setting: "vpn.secrets",
+				Input:   newInput("Contraseña VPN", true),
+			},
+		)
+	case "wireguard":
+		fields = append(fields,
+			Field{
+				Label:   "Interfaz",
+				Setting: "connection.interface-name",
+				Input:   newInput("Interfaz (ej: wg0)", false),
+			},
+		)
+	case "sstp":
+		fields = append(fields,
+			Field{
+				Label:   "Servidor",
+				Setting: "vpn.data",
+				Input:   newInput("Servidor (ej: vpn.example.com)", false),
+			},
+			Field{
+				Label:   "Usuario",
+				Setting: "vpn.user-name",
+				Input:   newInput("Usuario SSTP", false),
+			},
+			Field{
+				Label:   "Contraseña",
+				Setting: "vpn.secrets",
+				Input:   newInput("Contraseña SSTP", true),
+			},
+		)
 	}
 
 	fields = append(fields,

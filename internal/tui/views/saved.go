@@ -60,6 +60,7 @@ type connActionMsg struct {
 	action string // "connect", "delete", "password"
 	name   string
 	err    error
+	pwd    string // contraseña recuperada (action == "password")
 }
 
 func fetchConnections() tea.Msg {
@@ -82,7 +83,7 @@ func fetchPassword(name string) tea.Msg {
 	if err != nil || pwd == "" {
 		return connActionMsg{action: "password", name: name, err: fmt.Errorf("sin contraseña o no es WiFi")}
 	}
-	return connActionMsg{action: "password", name: name, err: nil}
+	return connActionMsg{action: "password", name: name, pwd: pwd, err: nil}
 }
 
 func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
@@ -133,6 +134,7 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 				m.password = ""
 				return m, nil
 			}
+			m.password = msg.pwd
 		}
 		return m, nil
 
@@ -295,11 +297,26 @@ func (m SavedModel) View() string {
 	}
 
 	if m.state == savedShowingPwd {
-		if m.password != "" {
-			return m.renderTableView()
-		}
-
-		return m.renderTableView()
+		view := m.renderTableView()
+		pwdBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(theme.ColorPrimary).
+			Padding(1, 2).
+			Width(50).
+			Render(
+				lipgloss.JoinVertical(lipgloss.Center,
+					lipgloss.NewStyle().Foreground(theme.ColorPrimary).Bold(true).Render("🔑 Contraseña de " + m.getSelectedName()),
+					"",
+					lipgloss.NewStyle().Foreground(theme.ColorText).Render(m.password),
+					"",
+					lipgloss.NewStyle().Foreground(theme.ColorSubtle).Render("Presiona cualquier tecla para cerrar"),
+				),
+			)
+		return lipgloss.JoinVertical(lipgloss.Top,
+			view,
+			"",
+			pwdBox,
+		)
 	}
 
 	if m.state == savedDone || m.state == savedError {
