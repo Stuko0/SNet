@@ -260,11 +260,11 @@ func (m WifiListModel) getSelectedSSID() string {
 	if len(m.table.Rows()) == 0 {
 		return ""
 	}
-	row := m.table.SelectedRow()
-	if len(row) == 0 {
+	idx := m.table.Cursor()
+	if idx < 0 || idx >= len(m.networks) {
 		return ""
 	}
-	return row[0]
+	return m.networks[idx].SSID
 }
 
 func (m WifiListModel) View() string {

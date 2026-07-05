@@ -340,7 +340,7 @@ func (m SavedModel) renderTableView() string {
 	}
 
 	help := lipgloss.NewStyle().Foreground(theme.ColorSubtle).Render(
-		"  ↑/↓: Navegar  Enter: Conectar  d: Eliminar  p: Ver contraseña  r: Refrescar  ?: Ayuda",
+		"  ↑/↓: Navegar  Enter: Conectar  e: Editar  d: Eliminar  p: Ver contraseña  r: Refrescar  ?: Ayuda",
 	)
 
 	return theme.CardStyle.Render(

@@ -60,8 +60,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case views.EditConnectionMsg:
 		editor := views.NewEditor(msg.Name, msg.Type)
+		loadCmd := editor.LoadCmd()
 		m.editor = &editor
-		return m, nil
+		return m, loadCmd
 
 	case tea.KeyMsg:
 		if m.showHelp {
@@ -319,6 +320,7 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 			{"↑/↓", "Navegar"},
 			{"Enter", "Conectar"},
 			{"d", "Eliminar"},
+			{"e", "Editar"},
 			{"p", "Password"},
 			{"r", "Refrescar"},
 			{"?", "Ayuda"},

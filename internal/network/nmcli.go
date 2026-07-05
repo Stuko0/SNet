@@ -311,6 +311,9 @@ func DeleteConnection(name string) error          { return DefaultClient.DeleteC
 func GetConnectionPassword(name string) (string, error) {
 	return DefaultClient.GetConnectionPassword(name)
 }
+func GetConnectionSettings(name string, settings ...string) (map[string]string, error) {
+	return DefaultClient.GetConnectionSettings(name, settings...)
+}
 func ModifyConnection(name, setting, value string) error {
 	return DefaultClient.ModifyConnection(name, setting, value)
 }
