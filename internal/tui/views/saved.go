@@ -276,9 +276,6 @@ type EditConnectionMsg struct {
 func (m SavedModel) View() string {
 	if m.state == savedLoading {
 		label := "Cargando conexiones..."
-		if m.password == "" && m.state == savedLoading {
-			label = "Cargando conexiones..."
-		}
 		return theme.CardStyle.Render(
 			theme.CardTitleStyle.Render("󰆓 Conexiones Guardadas") + "\n\n" +
 				m.spinner.View() + " " + label,

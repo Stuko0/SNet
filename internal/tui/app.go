@@ -51,6 +51,14 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// ==========================================================
+	// Editor overlay: intercept ALL messages while active
+	// (spinner ticks, settings load results, key presses, etc.)
+	// ==========================================================
+	if m.editor != nil {
+		return m.updateEditor(msg)
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -104,21 +112,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, func() tea.Msg {
 				return views.RefreshMsg{}
 			}
-		}
-
-		if m.editor != nil {
-			if keyMatches(msg, Keys.Escape) && !m.editor.IsDone() {
-				m.editor = nil
-				return m, nil
-			}
-			var cmd tea.Cmd
-			updatedEditor, cmd := m.editor.Update(msg)
-			m.editor = &updatedEditor
-			if m.editor.IsDone() && keyMatches(msg, Keys.Escape) {
-				m.editor = nil
-				return m, func() tea.Msg { return views.RefreshMsg{} } // Actualizado a RefreshMsg
-			}
-			return m, cmd
 		}
 
 	case tea.MouseMsg:
@@ -176,21 +169,53 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.dashboard, cmd = m.dashboard.Update(msg)
 		if cmd != nil { cmds = append(cmds, cmd) }
-		
+
 		m.wifiList, cmd = m.wifiList.Update(msg)
 		if cmd != nil { cmds = append(cmds, cmd) }
-		
+
 		m.saved, cmd = m.saved.Update(msg)
 		if cmd != nil { cmds = append(cmds, cmd) }
-		
+
 		m.vpnList, cmd = m.vpnList.Update(msg)
 		if cmd != nil { cmds = append(cmds, cmd) }
-		
+
 		m.hotspot, cmd = m.hotspot.Update(msg)
 		if cmd != nil { cmds = append(cmds, cmd) }
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+// updateEditor maneja TODOS los mensajes mientras el editor overlay está activo
+func (m Model) updateEditor(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Escape sin cambios → cerrar editor
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		if keyMatches(keyMsg, Keys.Escape) && !m.editor.IsDone() {
+			m.editor = nil
+			return m, nil
+		}
+		// Quit desde el editor
+		if keyMatches(keyMsg, Keys.Quit) {
+			m.quitting = true
+			return m, nil
+		}
+	}
+
+	// Pasar el mensaje al editor
+	var cmd tea.Cmd
+	updatedEditor, cmd := m.editor.Update(msg)
+	m.editor = &updatedEditor
+
+	// Si el editor terminó (save ok/error) y fue la última tecla Escape → cerrar
+	if m.editor.IsDone() {
+		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMatches(keyMsg, Keys.Escape) {
+			m.editor = nil
+			return m, func() tea.Msg { return views.RefreshMsg{} }
+		}
+		// cualquier otra tecla: volver a editing (descartar toast)
+	}
+
+	return m, cmd
 }
 
 func (m Model) View() string {
