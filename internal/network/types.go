@@ -5,6 +5,7 @@ import "fmt"
 // Client defines the interface for NetworkManager operations.
 // Implementations can wrap nmcli (production) or be mocked (tests).
 type Client interface {
+	GetGeneralStatus() string
 	GetConnectivity() ConnectivityStatus
 	GetActiveConnection() (*NetworkState, error)
 	ScanWiFi(rescan bool) ([]WiFiNetwork, error)
@@ -14,6 +15,7 @@ type Client interface {
 	Disconnect(device string) error
 	DeleteConnection(name string) error
 	GetConnectionPassword(name string) (string, error)
+	GetConnectionSettings(name string, settings ...string) (map[string]string, error)
 	ModifyConnection(name, setting, value string) error
 	ConnectionUp(name string) error
 	ConnectionDown(name string) error
