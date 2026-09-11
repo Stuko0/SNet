@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 
+	"github.com/Stuko0/SNet/internal/config"
 	"github.com/Stuko0/SNet/internal/tui/theme"
 	"github.com/Stuko0/SNet/internal/tui/views"
 
@@ -31,6 +32,11 @@ type Model struct {
 	ready     bool
 	activeTab int
 
+	// cfg es la configuración persistente (pestaña activa al cerrar, etc.).
+	// Antes el paquete config existía pero nadie lo llamaba: la pestaña se
+	// perdía en cada arranque.
+	cfg *config.Config
+
 	// Sub-modelos por vista
 	dashboard views.DashboardModel
 	wifiList  views.WifiListModel
@@ -46,13 +52,39 @@ type Model struct {
 }
 
 func NewModel() Model {
+	// La config se carga acá y no puede fallar: LoadConfig cae a defaults ante
+	// archivo ausente o corrupto, para que una config rota no impida arrancar.
+	cfg, err := config.LoadConfig()
+	if err != nil || cfg == nil {
+		cfg = config.Default()
+	}
+
 	return Model{
+		cfg:       cfg,
+		activeTab: cfg.LastTab,
 		dashboard: views.NewDashboard(),
 		wifiList:  views.NewWifiList(),
 		saved:     views.NewSaved(),
 		vpnList:   views.NewVPNList(),
 		hotspot:   views.NewHotspot(),
 	}
+}
+
+// saveConfig persiste el estado actual. Los errores se ignoran a propósito: no
+// poder guardar preferencias no debe romper la sesión ni mostrar un error.
+func (m Model) saveConfig() {
+	if m.cfg == nil {
+		return
+	}
+	m.cfg.LastTab = m.activeTab
+	_ = config.SaveConfig(m.cfg)
+}
+
+// SaveConfigHook devuelve una función que persiste el estado actual sin
+// necesitar el modelo. main() la usa al recibir SIGTERM/SIGINT: en ese camino
+// Bubble Tea no ejecuta Update, así que la pestaña se perdería.
+func (m Model) SaveConfigHook() func() {
+	return func() { m.saveConfig() }
 }
 
 func (m Model) Init() tea.Cmd {
@@ -99,6 +131,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.quitting {
 			switch {
 			case keyMatches(msg, Keys.Quit):
+				// Guardar antes de salir: es el momento en que la pestaña
+				// activa queda registrada para el próximo arranque.
+				m.saveConfig()
 				return m, tea.Quit
 			default:
 				m.quitting = false
@@ -122,10 +157,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case keyMatches(msg, Keys.Tab):
 			m.activeTab = (m.activeTab + 1) % len(theme.TabTitles)
+			m.saveConfig()
 			return m, func() tea.Msg { return views.RefreshMsg{} }
 
 		case keyMatches(msg, Keys.ShiftTab):
 			m.activeTab = (m.activeTab - 1 + len(theme.TabTitles)) % len(theme.TabTitles)
+			m.saveConfig()
 			return m, func() tea.Msg { return views.RefreshMsg{} }
 
 		case keyMatches(msg, Keys.Refresh):
@@ -148,6 +185,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if msg.X >= x && msg.X < x+w {
 						if m.activeTab != i {
 							m.activeTab = i
+							m.saveConfig()
 							return m, func() tea.Msg { return views.RefreshMsg{} }
 						}
 						break
@@ -429,8 +467,10 @@ func renderFooter(quitting bool, showHelp bool, activeTab int, ancho int) string
 	switch activeTab {
 	case 0:
 		keys = []struct{ key, desc string }{
+			{"x", "Desconectar"},
+			{"w", "Wi-Fi on/off"},
+			{"r", "Refrescar"},
 			{"Tab", "Navegar"},
-			{"r", "Refresh"},
 			{"?", "Ayuda"},
 			{"Ctrl+q", "Salir"},
 		}
@@ -446,10 +486,11 @@ func renderFooter(quitting bool, showHelp bool, activeTab int, ancho int) string
 		keys = []struct{ key, desc string }{
 			{"↑/↓", "Navegar"},
 			{"Enter", "Conectar"},
-			{"d", "Eliminar"},
+			{"/", "Buscar"},
+			{"s", "Ordenar"},
 			{"e", "Editar"},
-			{"p", "Password"},
-			{"c", "Copiar"},
+			{"d", "Eliminar"},
+			{"p", "Contraseña"},
 			{"r", "Refrescar"},
 			{"?", "Ayuda"},
 		}
@@ -525,6 +566,10 @@ func renderHelp(width, height int) string {
 			"",
 			"  Acciones:",
 			helpRow("r", "Refrescar estado / escanear"),
+			helpRow("/", "Buscar en la lista (Esc limpia)"),
+			helpRow("s", "Cambiar el orden de la lista"),
+			helpRow("x", "Desconectar la conexión activa (Estado)"),
+			helpRow("w", "Encender/apagar la radio Wi-Fi (Estado)"),
 			helpRow("e", "Editar conexión"),
 			helpRow("d", "Eliminar conexión"),
 			helpRow("p", "Ver contraseña guardada (Wi-Fi)"),
