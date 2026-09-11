@@ -78,7 +78,7 @@ func (c *NmcliClient) GetActiveConnection() (*NetworkState, error) {
 			continue
 		}
 		name, iftype, device := parts[0], parts[1], parts[2]
-		
+
 		if isVPNSection(iftype) {
 			state.ActiveVPNs = append(state.ActiveVPNs, name)
 		} else if iftype == "802-11-wireless" || iftype == "802-3-ethernet" || iftype == "wifi" || iftype == "ethernet" {

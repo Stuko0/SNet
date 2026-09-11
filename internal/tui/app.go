@@ -168,19 +168,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Mensajes globales (resultados en segundo plano, spinners): a todas las vistas
 		var cmd tea.Cmd
 		m.dashboard, cmd = m.dashboard.Update(msg)
-		if cmd != nil { cmds = append(cmds, cmd) }
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
 		m.wifiList, cmd = m.wifiList.Update(msg)
-		if cmd != nil { cmds = append(cmds, cmd) }
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
 		m.saved, cmd = m.saved.Update(msg)
-		if cmd != nil { cmds = append(cmds, cmd) }
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
 		m.vpnList, cmd = m.vpnList.Update(msg)
-		if cmd != nil { cmds = append(cmds, cmd) }
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
 		m.hotspot, cmd = m.hotspot.Update(msg)
-		if cmd != nil { cmds = append(cmds, cmd) }
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return m, tea.Batch(cmds...)

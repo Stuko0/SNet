@@ -302,7 +302,7 @@ func (m SavedModel) View() string {
 			Width(50).
 			Render(
 				lipgloss.JoinVertical(lipgloss.Center,
-					lipgloss.NewStyle().Foreground(theme.ColorPrimary).Bold(true).Render("🔑 Contraseña de " + m.getSelectedName()),
+					lipgloss.NewStyle().Foreground(theme.ColorPrimary).Bold(true).Render("🔑 Contraseña de "+m.getSelectedName()),
 					"",
 					lipgloss.NewStyle().Foreground(theme.ColorText).Render(m.password),
 					"",
