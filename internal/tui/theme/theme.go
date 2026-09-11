@@ -31,13 +31,14 @@ var (
 			Foreground(ColorPrimary).
 			Bold(true)
 
-	// Tabs
+	// Tabs: sin padding izquierdo, para que el texto de la primera pestaña
+	// alinee con el borde de la tarjeta y del header.
 	TabStyle = lipgloss.NewStyle().
-			Padding(0, 2).
+			Padding(0, 2, 0, 0).
 			Foreground(ColorSubtle)
 
 	ActiveTabStyle = lipgloss.NewStyle().
-			Padding(0, 2).
+			Padding(0, 2, 0, 0).
 			Foreground(lipgloss.AdaptiveColor{Light: "#faf4ed", Dark: "#232136"}).
 			Background(ColorPrimary).
 			Bold(true)
@@ -48,8 +49,7 @@ var (
 
 	// Barra de estado (footer)
 	FooterStyle = lipgloss.NewStyle().
-			Foreground(ColorPrimary).
-			Padding(0, 1)
+			Foreground(ColorPrimary)
 
 	FooterKeyStyle = lipgloss.NewStyle().
 			Foreground(ColorPrimary).
@@ -117,6 +117,10 @@ var (
 	TableStyle = lipgloss.NewStyle().
 			MarginLeft(2).
 			MarginRight(2)
+
+	// OutputHintStyle: barra de atajos dentro de una vista (más tenue que el footer global)
+	OutputHintStyle = lipgloss.NewStyle().
+			Foreground(ColorSubtle)
 )
 
 // TabTitles son los nombres de las pestañas

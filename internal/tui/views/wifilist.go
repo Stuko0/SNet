@@ -166,14 +166,14 @@ func (m WifiListModel) handlePasswordKey(msg tea.KeyMsg) (WifiListModel, tea.Cmd
 			func() tea.Msg { return connectToNetwork(ssid, pwd) },
 		)
 
-	case "esc":
+	case "esc", "ctrl+c":
 		m.state = wifiIdle
 		m.password.SetValue("")
 		m.password.Blur()
+		m.showPassword = false
 		return m, nil
 
 	case "ctrl+t":
-
 		m.showPassword = !m.showPassword
 		if m.showPassword {
 			m.password.EchoMode = textinput.EchoNormal
@@ -183,6 +183,8 @@ func (m WifiListModel) handlePasswordKey(msg tea.KeyMsg) (WifiListModel, tea.Cmd
 		return m, nil
 
 	default:
+		// Todo lo demás va al input, incluidas 'q', '?' y 'r' (si no, escribir
+		// una contraseña con 'r' se interpretaba como refresh de la vista).
 		var cmd tea.Cmd
 		m.password, cmd = m.password.Update(msg)
 		return m, cmd
@@ -255,6 +257,9 @@ func (m WifiListModel) initiateConnection(ssid string) (WifiListModel, tea.Cmd) 
 	m.state = wifiError
 	return m, nil
 }
+
+// IsPasswordState informa si la vista está esperando la contraseña de la red.
+func (m WifiListModel) IsPasswordState() bool { return m.state == wifiPassword }
 
 func (m WifiListModel) getSelectedSSID() string {
 	if len(m.table.Rows()) == 0 {

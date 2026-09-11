@@ -2,6 +2,8 @@ package views
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/Stuko0/SNet/internal/network"
 	"github.com/Stuko0/SNet/internal/tui/theme"
 
@@ -22,6 +24,7 @@ const (
 	vpnDisconnecting
 	vpnAddType   // seleccionar tipo de VPN a añadir
 	vpnAddConfig // configurar nueva VPN
+	vpnConfirmAdd
 	vpnDone
 	vpnError
 )
@@ -186,12 +189,20 @@ func (m VPNListModel) Update(msg tea.Msg) (VPNListModel, tea.Cmd) {
 		if m.state == vpnAddConfig {
 			return m.handleAddConfigKey(msg)
 		}
+		if m.state == vpnConfirmAdd {
+			return m.handleAddConfirmKey(msg)
+		}
 		if m.state == vpnIdle || m.state == vpnConnecting {
 			return m.handleIdleKey(msg)
 		}
 	}
 
 	return m, nil
+}
+
+// IsAdding informa si el usuario está dentro del asistente de nueva VPN.
+func (m VPNListModel) IsAdding() bool {
+	return m.state == vpnAddType || m.state == vpnAddConfig || m.state == vpnConfirmAdd
 }
 
 func (m VPNListModel) handleIdleKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd) {
@@ -292,12 +303,19 @@ func (m VPNListModel) handleAddTypeKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd) {
 
 func (m VPNListModel) handleAddConfigKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd) {
 	switch msg.String() {
-	case "esc":
+	case "esc", "ctrl+c":
 		m.state = vpnIdle
 		return m, nil
 
 	case "enter":
-		return m.doAddVPN()
+		// Enter avanza; en el último campo guarda (antes guardaba desde el
+		// primer campo y creaba VPNs a medio llenar).
+		if m.addField == m.addFieldCount()-1 {
+			return m.doAddVPN()
+		}
+		m.addField = (m.addField + 1) % m.addFieldCount()
+		m.updateAddFocus()
+		return m, nil
 
 	case "tab", "down":
 		m.addField = (m.addField + 1) % m.addFieldCount()
@@ -308,6 +326,9 @@ func (m VPNListModel) handleAddConfigKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd)
 		m.addField = (m.addField - 1 + m.addFieldCount()) % m.addFieldCount()
 		m.updateAddFocus()
 		return m, nil
+
+	case "ctrl+s":
+		return m.doAddVPN()
 
 	default:
 		return m.updateAddField(msg)
@@ -360,11 +381,13 @@ func (m *VPNListModel) updateAddFocus() {
 	case 3:
 		if m.addType == "openvpn" {
 			m.addUser.Focus()
+		} else if m.addType == "wireguard" {
+			m.addConfig.Focus()
 		} else {
 			m.addPassword.Focus()
 		}
 	case 4:
-		_ = m.addConfig.Focus()
+		m.addPassword.Focus()
 	}
 }
 
@@ -390,16 +413,83 @@ func (m VPNListModel) doAddVPN() (VPNListModel, tea.Cmd) {
 		return m, nil
 	}
 
-	return m, func() tea.Msg {
-		return addVPN(
-			name,
-			m.addType,
-			m.addServer.Value(),
-			m.addPort.Value(),
-			m.addUser.Value(),
-			m.addPassword.Value(),
-		)
+	// Pedir confirmación: creaba la VPN con Enter sin revisar lo tipeado.
+	m.state = vpnConfirmAdd
+	return m, nil
+}
+
+// handleAddConfirmKey confirma o cancela la creación de la VPN.
+func (m VPNListModel) handleAddConfirmKey(msg tea.KeyMsg) (VPNListModel, tea.Cmd) {
+	switch msg.String() {
+	case "enter", "y":
+		return m, func() tea.Msg {
+			return addVPN(
+				m.addName.Value(),
+				m.addType,
+				m.addServer.Value(),
+				m.addPort.Value(),
+				m.addUser.Value(),
+				m.addPassword.Value(),
+			)
+		}
+	case "esc", "n", "ctrl+c":
+		m.state = vpnAddConfig
+		return m, nil
 	}
+	return m, nil
+}
+
+// renderAddConfirm resume la configuración a crear y pide confirmación.
+func (m VPNListModel) renderAddConfirm() string {
+	fila := func(label, valor string) string {
+		if valor == "" {
+			valor = "-"
+		}
+		return "  " + theme.LabelStyle.Render(label+":") + " " + theme.ValueStyle.Render(cortarPorAnchoPlano(valor, 40))
+	}
+
+	var filas []string
+	switch m.addType {
+	case "openvpn":
+		filas = []string{
+			fila("Nombre", m.addName.Value()),
+			fila("Servidor", m.addServer.Value()),
+			fila("Puerto", m.addPort.Value()),
+			fila("Usuario", m.addUser.Value()),
+			fila("Password", strings.Repeat("●", len([]rune(m.addPassword.Value())))),
+		}
+	case "wireguard":
+		filas = []string{
+			fila("Nombre", m.addName.Value()),
+			fila("Interfaz", m.addIface.Value()),
+			fila("Config", m.addConfig.Value()),
+		}
+	case "sstp":
+		filas = []string{
+			fila("Nombre", m.addName.Value()),
+			fila("Servidor", m.addServer.Value()),
+			fila("Usuario", m.addUser.Value()),
+			fila("Password", strings.Repeat("●", len([]rune(m.addPassword.Value())))),
+		}
+	}
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(theme.ColorPrimary).
+		Padding(1, 3).
+		Width(58).
+		Render(
+			lipgloss.JoinVertical(lipgloss.Left,
+				lipgloss.NewStyle().Foreground(theme.ColorPrimary).Bold(true).
+					Render("󰒄 Crear VPN "+fmt.Sprintf("(%s)", m.addType)),
+				"",
+				lipgloss.JoinVertical(lipgloss.Left, filas...),
+				"",
+				theme.OutputHintStyle.Render("  Enter/y: Crear  Esc/n: Volver a editar"),
+			),
+		)
+
+	return lipgloss.JoinVertical(lipgloss.Top, m.renderTableView(), "", box)
 }
 
 func (m VPNListModel) getSelectedName() string {
@@ -453,6 +543,8 @@ func (m VPNListModel) View() string {
 		return m.renderAddType()
 	case vpnAddConfig:
 		return m.renderAddConfig()
+	case vpnConfirmAdd:
+		return m.renderAddConfirm()
 	default:
 		view := m.renderTableView()
 		if m.state == vpnDone || m.state == vpnError {
@@ -525,12 +617,23 @@ func (m VPNListModel) renderAddConfig() string {
 	var fields []string
 
 	addField := func(label, cursor string, input textinput.Model) {
-		fields = append(fields, cursor+"  "+theme.LabelStyle.Render(label)+" "+input.View())
+		// Se compone la fila completa y recién después se colorea el cursor:
+		// antes el ▸ se renderizaba y luego se concatenaba texto, así que en
+		// cuanto el valor pasaba de ~52 columnas el estilo se cerraba y el
+		// cursor dejaba de pintarse (el foco "desaparecía").
+		row := cursor + "  " + theme.LabelStyle.Render(label) + " " + input.View()
+		if cursor == "▸" {
+			row = cortarPorAncho(row, 72)
+			row = lipgloss.NewStyle().Foreground(theme.ColorPrimary).Render("▸") + row[1:]
+		} else {
+			row = cortarPorAncho(row, 72)
+		}
+		fields = append(fields, row)
 	}
 
 	cursor := func(idx int) string {
 		if m.addField == idx {
-			return lipgloss.NewStyle().Foreground(theme.ColorPrimary).Render("▸")
+			return "▸"
 		}
 		return " "
 	}
@@ -551,8 +654,8 @@ func (m VPNListModel) renderAddConfig() string {
 		addField("Password:", cursor(3), m.addPassword)
 	}
 
-	help := lipgloss.NewStyle().Foreground(theme.ColorSubtle).Render(
-		"  Tab/↓: Siguiente  Enter: Guardar  Esc: Cancelar",
+	help := theme.OutputHintStyle.Render(
+		"  Tab/↓: Siguiente  Shift+Tab/↑: Anterior  Enter: Guardar (en el último campo)  Ctrl+s: Guardar  Esc: Cancelar",
 	)
 
 	return theme.CardStyle.Render(

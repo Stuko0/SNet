@@ -22,6 +22,8 @@ go.work.sum
 
 # Environment
 .env
+.env.*
+!.env.example
 
 # Editor
 .vscode/
@@ -37,6 +39,12 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
+*.AppImage
+*.deb
+*.rpm
 
 # Markdowns
 PLAN.md
+
+# Graphify
+graphify-out/

@@ -167,15 +167,34 @@ func (m HotspotModel) Update(msg tea.Msg) (HotspotModel, tea.Cmd) {
 	return m, nil
 }
 
+// focusFieldCount devuelve cuántos controles tiene el formulario (SSID,
+// password, banda y botón de inicio). Con hotspot activo solo se puede
+// navegar por los dos primeros; el resto no recibe foco.
+func (m HotspotModel) focusFieldCount() int {
+	if m.status != nil && m.status.Active {
+		return 2
+	}
+	return 4
+}
+
 func (m HotspotModel) handleKey(msg tea.KeyMsg) (HotspotModel, tea.Cmd) {
 	switch msg.String() {
 	case "tab", "down":
-		m.focusField = (m.focusField + 1) % 4
+		// Con el hotspot activo el foco se queda en los dos campos editables:
+		// el toggle de banda y el botón "Iniciar" reventaban el layout de la
+		// tarjeta activa (que no los dibuja).
+		if m.status != nil && m.status.Active {
+			return m, nil
+		}
+		m.focusField = (m.focusField + 1) % m.focusFieldCount()
 		m.updateFocus()
 		return m, nil
 
 	case "shift+tab", "up":
-		m.focusField = (m.focusField - 1 + 4) % 4
+		if m.status != nil && m.status.Active {
+			return m, nil
+		}
+		m.focusField = (m.focusField - 1 + m.focusFieldCount()) % m.focusFieldCount()
 		m.updateFocus()
 		return m, nil
 
@@ -183,14 +202,14 @@ func (m HotspotModel) handleKey(msg tea.KeyMsg) (HotspotModel, tea.Cmd) {
 		return m.handleEnter()
 
 	case "left":
-		if m.focusField == 2 {
+		if m.focusField == 2 && !(m.status != nil && m.status.Active) {
 			m.band = "bg"
 			return m, nil
 		}
 		return m, nil
 
 	case "right":
-		if m.focusField == 2 {
+		if m.focusField == 2 && !(m.status != nil && m.status.Active) {
 			m.band = "a"
 			return m, nil
 		}

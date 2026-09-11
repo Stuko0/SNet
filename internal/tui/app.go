@@ -1,12 +1,27 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/Stuko0/SNet/internal/tui/theme"
 	"github.com/Stuko0/SNet/internal/tui/views"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+)
+
+const (
+	// appPadding es el padding horizontal de theme.AppStyle (0, 1).
+	appPadding = 1
+	// maxContentWidth acota la columna de contenido: en terminales anchas
+	// (150+ columnas) las tarjetas se centran en vez de estirarse o quedar
+	// pegadas a la izquierda.
+	maxContentWidth = 100
+	// minContentWidth es el ancho mínimo con el que el layout sigue siendo
+	// legible (el diseño asume ~80 columnas).
+	minContentWidth = 76
 )
 
 // Model es el modelo principal de la aplicación
@@ -97,6 +112,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case keyMatches(msg, Keys.Help):
+			if m.helpBlocked() {
+				// La vista activa está mostrando un formulario/modal: la '?'
+				// debe llegarle (o ignorarse), no abrir el overlay de ayuda.
+				break
+			}
 			m.showHelp = true
 			return m, nil
 
@@ -196,6 +216,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+// helpBlocked indica si la vista activa está en un sub-estado (formulario,
+// modal, input) en el que '?' debe llegarle a ella en vez de abrir la ayuda
+// global, que tapaba la pantalla y descartaba lo que se estaba escribiendo.
+func (m Model) helpBlocked() bool {
+	switch m.activeTab {
+	case 1: // Wi-Fi: pidiendo contraseña
+		return m.wifiList.IsPasswordState()
+	case 3: // VPN: asistente de alta
+		return m.vpnList.IsAdding()
+	}
+	return false
+}
+
 // updateEditor maneja TODOS los mensajes mientras el editor overlay está activo
 func (m Model) updateEditor(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Escape sin cambios → cerrar editor
@@ -235,16 +268,26 @@ func (m Model) View() string {
 			Render("Inicializando SNet...")
 	}
 
-	header := lipgloss.JoinHorizontal(lipgloss.Center,
-		theme.LogoStyle.Render("󰣺 SNet"),
-		theme.TitleStyle.Render("v0.1.0"),
-		lipgloss.NewStyle().Width(m.width-18).Render(""),
-		theme.LabelStyle.Render("NetworkManager TUI"),
-	)
-
 	tabRow := renderTabs(m.activeTab)
 
-	// Contenido
+	// Columna de contenido: se acota a maxContentWidth y se CENTRA en la
+	// terminal. Sin esto, en una ventana ancha (kitty 1000px ≈ 150 cols) cada
+	// tarjeta quedaba pegada al borde izquierdo con un ancho fijo (Estado 29,
+	// Hotspot 30, Guardadas 84) y la vista parecía rota.
+	contentWidth := m.width - 2*appPadding
+	if contentWidth > maxContentWidth {
+		contentWidth = maxContentWidth
+	}
+	if contentWidth < minContentWidth {
+		contentWidth = minContentWidth
+	}
+	// La fila de pestañas mide su ancho natural y se alinea a la izquierda; si
+	// la columna es más angosta que ella, el centrado la desplaza y el tab row
+	// queda desalineado respecto a la tarjeta.
+	if tabAncho := lipgloss.Width(renderTabs(0)); tabAncho > contentWidth {
+		contentWidth = tabAncho
+	}
+
 	var content string
 	switch m.activeTab {
 	case 0:
@@ -259,55 +302,104 @@ func (m Model) View() string {
 		content = m.hotspot.View()
 	}
 
-	contentWidth := m.width - 4
-	if contentWidth < 40 {
-		contentWidth = 40
+	// Toda tarjeta se renderiza dentro de la misma columna: así el borde
+	// izquierdo y el derecho alinean entre tabs y entre estados de carga.
+	content = lipgloss.NewStyle().
+		Width(contentWidth).
+		MaxWidth(contentWidth).
+		Render(content)
+
+	// Header alineado a la misma columna que el contenido.
+	header := m.renderHeader(contentWidth)
+	footer := renderFooter(m.quitting, m.showHelp, m.activeTab, contentWidth)
+
+	// Cada línea se normaliza al ancho de la columna: JoinVertical alinea a la
+	// IZQUIERDA, así que todos los bloques deben medir exactamente
+	// contentWidth o el centrado posterior los desplaza y el layout queda
+	// desalineado.
+	normalizar := func(s string) string {
+		lineas := strings.Split(s, "\n")
+		for i, l := range lineas {
+			if w := lipgloss.Width(l); w < contentWidth {
+				lineas[i] = l + strings.Repeat(" ", contentWidth-w)
+			}
+		}
+		return strings.Join(lineas, "\n")
 	}
-	content = lipgloss.NewStyle().Width(contentWidth).Render(content)
+
+	inner := lipgloss.JoinVertical(lipgloss.Left,
+		normalizar(header),
+		normalizar(tabRow),
+		normalizar(content),
+		normalizar(footer),
+	)
+
+	// En terminales anchas, la columna completa se centra: si no, todo queda
+	// pegado al borde izquierdo y la vista parece rota (reportado en kitty a
+	// ~150 columnas).
+	if m.width > contentWidth+2*appPadding {
+		inner = lipgloss.Place(m.width-2*appPadding, 0,
+			lipgloss.Center, lipgloss.Top, inner)
+	}
 
 	if m.editor != nil {
-		editorView := lipgloss.Place(m.width, m.height,
+		return lipgloss.Place(m.width, m.height,
 			lipgloss.Center, lipgloss.Center,
 			m.editor.View(),
 		)
-		return editorView
 	}
 
-	footer := renderFooter(m.quitting, m.showHelp, m.activeTab)
-
 	if m.showHelp {
-		helpView := renderHelp(m.width, m.height)
-		return helpView
+		return renderHelp(m.width, m.height)
 	}
 
 	if m.quitting {
-		quitView := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(theme.ColorDanger).
-			Padding(1, 2).
-			Width(40).
-			Render(
-				lipgloss.JoinVertical(lipgloss.Center,
-					lipgloss.NewStyle().Foreground(theme.ColorDanger).Bold(true).Render("¿Salir de SNet?"),
-					"",
-					"Presiona "+keyStyle("Ctrl+q")+" para confirmar",
-					"o cualquier otra tecla para cancelar.",
-				),
-			)
 		return lipgloss.Place(m.width, m.height,
 			lipgloss.Center, lipgloss.Center,
-			quitView,
+			m.renderQuitConfirm(),
 		)
 	}
 
-	return theme.AppStyle.Render(
-		lipgloss.JoinVertical(lipgloss.Top,
-			header,
-			tabRow,
-			content,
-			footer,
-		),
+	return theme.AppStyle.Render(inner)
+}
+
+// renderHeader arma la barra superior con el logo a la izquierda y la etiqueta
+// a la derecha, usando el mismo ancho que la columna de contenido.
+func (m Model) renderHeader(ancho int) string {
+	izq := lipgloss.JoinHorizontal(lipgloss.Center,
+		theme.LogoStyle.Render("󰣺 SNet"),
+		theme.TitleStyle.Render("v0.1.0"),
 	)
+	der := theme.LabelStyle.Render("NetworkManager TUI")
+	// LabelStyle tiene Width(14), insuficiente para esta etiqueta: se usa un
+	// estilo sin ancho fijo para no estirar el header.
+	der = lipgloss.NewStyle().Foreground(theme.ColorSubtle).Render("NetworkManager TUI")
+
+	espacio := ancho - lipgloss.Width(izq) - lipgloss.Width(der)
+	if espacio < 1 {
+		espacio = 1
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Center,
+		izq,
+		lipgloss.NewStyle().Width(espacio).Render(""),
+		der,
+	)
+}
+
+func (m Model) renderQuitConfirm() string {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(theme.ColorDanger).
+		Padding(1, 2).
+		Width(40).
+		Render(
+			lipgloss.JoinVertical(lipgloss.Center,
+				lipgloss.NewStyle().Foreground(theme.ColorDanger).Bold(true).Render("¿Salir de SNet?"),
+				"",
+				"Presiona "+keyStyle("Ctrl+q")+" para confirmar",
+				"o cualquier otra tecla para cancelar.",
+			),
+		)
 }
 
 func renderTabs(active int) string {
@@ -322,9 +414,9 @@ func renderTabs(active int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
 }
 
-func renderFooter(quitting bool, showHelp bool, activeTab int) string {
+func renderFooter(quitting bool, showHelp bool, activeTab int, ancho int) string {
 	if showHelp {
-		return theme.FooterStyle.Width(100).
+		return theme.FooterStyle.Width(ancho).
 			Render("Presiona ? o Esc para cerrar la ayuda")
 	}
 	if quitting {
@@ -357,6 +449,7 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 			{"d", "Eliminar"},
 			{"e", "Editar"},
 			{"p", "Password"},
+			{"c", "Copiar"},
 			{"r", "Refrescar"},
 			{"?", "Ayuda"},
 		}
@@ -386,16 +479,38 @@ func renderFooter(quitting bool, showHelp bool, activeTab int) string {
 		}
 	}
 
+	// Se van agregando atajos mientras entren en el ancho disponible. Antes se
+	// volcaban todos y FooterStyle.Width(ancho) los envolvía a una segunda
+	// línea, dejando el footer desalineado respecto a la tarjeta.
+	//
+	// Se reserva 1 columna para que el ancho final nunca exceda `ancho`, y si
+	// hubo que omitir alguno se indica con "…" al final.
+	const sep = " "
+	usado := 0
 	var parts []string
 	for _, k := range keys {
-		parts = append(parts,
-			theme.FooterKeyStyle.Render(" "+k.key+" "),
-			theme.FooterDescStyle.Render(" "+k.desc+" "),
-		)
+		bloque := theme.FooterKeyStyle.Render(" "+k.key+" ") +
+			theme.FooterDescStyle.Render(" "+k.desc+" ")
+		w := lipgloss.Width(bloque) + len(sep)
+		if usado+w > ancho {
+			break
+		}
+		parts = append(parts, bloque)
+		usado += w
 	}
-	return theme.FooterStyle.Width(100).Render(
-		lipgloss.JoinHorizontal(lipgloss.Center, parts...),
-	)
+
+	linea := lipgloss.JoinHorizontal(lipgloss.Center, parts...)
+	if n := len(parts); n < len(keys) {
+		linea += theme.FooterDescStyle.Render("…")
+	}
+
+	// Se recorta al ancho de la columna: sin esto el footer podía medir más que
+	// la tarjeta y desbordar el borde de la terminal.
+	linea = ansi.Truncate(linea, ancho, "…")
+	if w := lipgloss.Width(linea); w < ancho {
+		linea += strings.Repeat(" ", ancho-w)
+	}
+	return theme.FooterStyle.Render(linea)
 }
 
 func renderHelp(width, height int) string {
@@ -412,7 +527,14 @@ func renderHelp(width, height int) string {
 			helpRow("r", "Refrescar estado / escanear"),
 			helpRow("e", "Editar conexión"),
 			helpRow("d", "Eliminar conexión"),
+			helpRow("p", "Ver contraseña guardada (Wi-Fi)"),
+			helpRow("c", "Copiar la contraseña mostrada"),
 			helpRow("Ctrl+n", "Nuevo (red / VPN / hotspot)"),
+			"",
+			"  Notas:",
+			helpRow("Guardadas", "con 'e' se abre el editor de la conexión"),
+			helpRow("VPN", "Enter avanza campo; en el último, crea (Ctrl+s siempre)"),
+			helpRow("Hotspot", "←/→ cambia la banda; requiere 8+ caracteres"),
 			"",
 			"  General:",
 			helpRow("?", "Mostrar esta ayuda"),

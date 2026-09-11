@@ -35,6 +35,12 @@ type SavedModel struct {
 	toastErr error
 	err      error
 	password string
+	// keyByRow mapea cada índice de fila de la tabla al nombre real de la
+	// conexión (la columna visible va truncada, no sirve para operar sobre nmcli).
+	keyByRow []string
+	// feedback del panel de contraseña (copiar al portapapeles)
+	pwdMsg    string
+	pwdMsgErr bool
 }
 
 func NewSaved() SavedModel {
@@ -98,7 +104,7 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 			break
 		}
 		m.conns = msg.conns
-		m.table = buildConnTable(msg.conns)
+		m.table, m.keyByRow = buildConnTable(msg.conns)
 		m.err = nil
 		return m, nil
 
@@ -160,9 +166,25 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 			return m.handleDeleteConfirm(msg)
 		}
 		if m.state == savedShowingPwd {
-
-			m.state = savedIdle
-			m.password = ""
+			switch msg.String() {
+			case "esc", "ctrl+c":
+				m.state = savedIdle
+				m.password = ""
+				m.pwdMsg = ""
+				m.pwdMsgErr = false
+			case "c":
+				// No romper el panel: se deja la contraseña en el portapapeles
+				// y se confirma en el hint.
+				if m.password != "" {
+					if err := clipboardCopy(m.password); err != nil {
+						m.pwdMsg = "✗ No se pudo copiar: " + err.Error()
+						m.pwdMsgErr = true
+					} else {
+						m.pwdMsg = "✓ Contraseña copiada al portapapeles"
+						m.pwdMsgErr = false
+					}
+				}
+			}
 			return m, nil
 		}
 		if m.state == savedIdle {
@@ -248,14 +270,11 @@ func (m SavedModel) handleIdleKey(msg tea.KeyMsg) (SavedModel, tea.Cmd) {
 }
 
 func (m SavedModel) getSelectedName() string {
-	if len(m.table.Rows()) == 0 {
+	idx := m.table.Cursor()
+	if idx < 0 || idx >= len(m.keyByRow) {
 		return ""
 	}
-	row := m.table.SelectedRow()
-	if len(row) == 0 {
-		return ""
-	}
-	return row[0]
+	return m.keyByRow[idx]
 }
 
 func (m SavedModel) getSelectedType() string {
@@ -268,22 +287,45 @@ func (m SavedModel) getSelectedType() string {
 	return ""
 }
 
+func (m SavedModel) selectedIsWiFi() bool {
+	selName := m.getSelectedName()
+	for _, c := range m.conns {
+		if c.Name == selName {
+			return c.Type == "wifi" || c.Type == "802-11-wireless"
+		}
+	}
+	return false
+}
+
 type EditConnectionMsg struct {
 	Name string
 	Type string
 }
 
+// savedCardWidth es el ancho interior de la tarjeta de Guardadas. Todas las
+// ramas de View() deben usar el MISMO ancho: si los estados "Cargando..."
+// (que miden su ancho natural, ~29 cols) no lo fijan, la tarjeta salta de
+// tamaño al llegar los datos y la estructura se percibe rota.
+const savedCardWidth = 72
+
+// savedCard envuelve un contenido en la tarjeta con el ancho uniforme.
+func savedCard(contenido string) string {
+	return theme.CardStyle.
+		Width(savedCardWidth).
+		Render(contenido)
+}
+
 func (m SavedModel) View() string {
 	if m.state == savedLoading {
 		label := "Cargando conexiones..."
-		return theme.CardStyle.Render(
+		return savedCard(
 			theme.CardTitleStyle.Render("󰆓 Conexiones Guardadas") + "\n\n" +
 				m.spinner.View() + " " + label,
 		)
 	}
 
 	if m.state == savedConnecting {
-		return theme.CardStyle.Render(
+		return savedCard(
 			theme.CardTitleStyle.Render("󰆓 Conexiones Guardadas") + "\n\n" +
 				m.spinner.View() + " Conectando a " + m.getSelectedName() + "...",
 		)
@@ -295,27 +337,13 @@ func (m SavedModel) View() string {
 
 	if m.state == savedShowingPwd {
 		view := m.renderTableView()
-		pwdBox := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(theme.ColorPrimary).
-			Padding(1, 2).
-			Width(50).
-			Render(
-				lipgloss.JoinVertical(lipgloss.Center,
-					lipgloss.NewStyle().Foreground(theme.ColorPrimary).Bold(true).Render("🔑 Contraseña de "+m.getSelectedName()),
-					"",
-					lipgloss.NewStyle().Foreground(theme.ColorText).Render(m.password),
-					"",
-					lipgloss.NewStyle().Foreground(theme.ColorSubtle).Render("Presiona cualquier tecla para cerrar"),
-				),
-			)
-		return lipgloss.JoinVertical(lipgloss.Top,
-			view,
-			"",
-			pwdBox,
-		)
+		// JoinVertical alinea al ancho del bloque más ancho y, si se fuerza con
+		// Width(), el redondeo del borde parte la línea en dos. MaxWidth acota
+		// sin estirar.
+		pwd := m.renderPasswordBox()
+		bloque := lipgloss.JoinVertical(lipgloss.Left, view, "", pwd)
+		return lipgloss.NewStyle().MaxWidth(innerWidth).Render(bloque)
 	}
-
 	if m.state == savedDone || m.state == savedError {
 		view := m.renderTableView()
 		toast := m.renderToast()
@@ -325,22 +353,91 @@ func (m SavedModel) View() string {
 	return m.renderTableView()
 }
 
+const (
+	// ancho útil del panel de contenido: 80 cols - 4 de margen del AppStyle.
+	innerWidth = 76
+	// ancho interior del panel de contraseña.
+	pwdBoxWidth = 60
+	// suma de las columnas de la tabla de conexiones (usada también para
+	// reservar el alto del estado vacío y mantener el mismo ancho).
+	savedTableWidth = 28 + 10 + 14 + 6 + 6
+)
+
+func (m SavedModel) renderPasswordBox() string {
+	nombre := m.getSelectedName()
+	if len([]rune(nombre)) > pwdBoxWidth-6 {
+		nombre = cortarPorAnchoPlano(nombre, pwdBoxWidth-6)
+	}
+
+	header := lipgloss.NewStyle().Foreground(theme.ColorPrimary).Bold(true).
+		Render("🔑 Contraseña de " + nombre)
+
+	var body string
+	if m.password == "" {
+		body = theme.WarningStyle.Render("Sin contraseña guardada para esta conexión")
+	} else {
+		// Se parte en varias líneas para que encaje dentro del panel (una PSK
+		// de 63+ chars desbordaba el borde).
+		body = theme.ValueStyle.Render(wrapTexto(m.password, pwdBoxWidth-10))
+	}
+
+	hint := theme.OutputHintStyle.Render("  p: Ver contraseña   c: Copiar   Esc: Cerrar")
+	if m.pwdMsg != "" {
+		estilo := theme.SuccessStyle
+		if m.pwdMsgErr {
+			estilo = theme.ErrorStyle
+		}
+		hint = estilo.Render("  " + m.pwdMsg)
+	}
+
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(theme.ColorPrimary).
+		Padding(1, 3).
+		Width(pwdBoxWidth).
+		Render(
+			lipgloss.JoinVertical(lipgloss.Left,
+				header,
+				"",
+				body,
+				"",
+				hint,
+			),
+		)
+}
+
 func (m SavedModel) renderTableView() string {
 	title := theme.CardTitleStyle.Render("󰆓 Conexiones Guardadas")
 	stats := fmt.Sprintf("  %d conexiones    ", len(m.conns))
 
 	var body string
 	if len(m.conns) == 0 {
-		body = "\n  No hay conexiones guardadas."
+		// Ojo: theme.LabelStyle tiene Width(14)+Align(Right), pensado para
+		// etiquetas de campo. Usarlo acá estiraba la tarjeta a ~174 columnas,
+		// así que el mensaje usa estilos sin ancho fijo.
+		mensaje := lipgloss.NewStyle().Foreground(theme.ColorText).
+			Render("No hay conexiones guardadas") + "\n" +
+			theme.OutputHintStyle.Render("Presiona 'r' para refrescar")
+		body = "\n" + theme.TableStyle.Render(
+			lipgloss.Place(savedTableWidth, 3, lipgloss.Center, lipgloss.Center, mensaje))
 	} else {
-		body = theme.TableStyle.Render(m.table.View())
+		body = "\n" + theme.TableStyle.Render(m.table.View())
 	}
 
-	help := lipgloss.NewStyle().Foreground(theme.ColorSubtle).Render(
-		"  ↑/↓: Navegar  Enter: Conectar  e: Editar  d: Eliminar  p: Ver contraseña  r: Refrescar  ?: Ayuda",
-	)
+	helpText := "  ↑/↓: Navegar  Enter: Conectar  e: Editar  d: Eliminar  p: Ver contraseña  r: Refrescar  ?: Ayuda"
+	if m.state == savedShowingPwd {
+		helpText = "  ↑/↓: Navegar  p: Ver contraseña  c: Copiar  Esc: Cerrar el panel"
+	}
+	if m.state == savedConfirmDelete {
+		helpText = "  Enter/y: Confirmar  Esc/n: Cancelar"
+	}
+	// Ojo con la concatenación: `body` ya termina en "\n" (viene de la tabla o
+	// del estado vacío) pero el `help` debe ir en su propia línea. Si la línea
+	// de atajos excede el ancho de la tarjeta, envolverla en vez de estirar el
+	// borde (medido: 98 columnas de atajos => tarjeta de 174 en un panel de 76).
+	help := theme.OutputHintStyle.Render(wrapTexto(helpText, savedCardWidth-6))
 
-	return theme.CardStyle.Render(
+	return savedCard(
 		title + "\n" +
 			stats + "\n" +
 			body + "\n" +
@@ -350,6 +447,9 @@ func (m SavedModel) renderTableView() string {
 
 func (m SavedModel) renderDeleteConfirm() string {
 	sel := m.getSelectedName()
+	if len([]rune(sel)) > 40 {
+		sel = cortarPorAnchoPlano(sel, 40)
+	}
 	confirmBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.ColorDanger).
@@ -361,10 +461,12 @@ func (m SavedModel) renderDeleteConfirm() string {
 				"",
 				theme.ValueStyle.Render("¿Eliminar \""+sel+"\" de forma permanente?"),
 				"",
-				lipgloss.NewStyle().Foreground(theme.ColorSubtle).Render("  Enter/y: Confirmar  Esc/n: Cancelar"),
+				theme.OutputHintStyle.Render("  Enter/y: Confirmar  Esc/n: Cancelar"),
 			),
 		)
 
+	// La barra de ayuda va arriba (la tabla real debajo) para que no cambie de
+	// posición al abrir/cerrar diálogos.
 	tableView := m.renderTableView()
 	return lipgloss.JoinVertical(lipgloss.Top,
 		tableView,
@@ -385,13 +487,18 @@ func (m SavedModel) renderToast() string {
 	return theme.ToastStyle.Render(style.Render(icon + " " + m.toast))
 }
 
-func buildConnTable(conns []network.Connection) table.Model {
+func buildConnTable(conns []network.Connection) (table.Model, []string) {
+	// El ancho total debe caber en savedCardWidth (72) menos el padding de
+	// CardStyle. table.Model añade ~5 columnas de separadores y padding, así
+	// que las columnas suman 60: 60+5=65 < 72-2*2=68. Antes sumaban 64 y la
+	// tabla desbordaba, partiendo la línea separadora y dejando el indicador
+	// de activo (●) en una fila propia.
 	columns := []table.Column{
-		{Title: "Nombre", Width: 28},
-		{Title: "Tipo", Width: 10},
-		{Title: "Dispositivo", Width: 14},
-		{Title: "Auto", Width: 6},
-		{Title: "", Width: 6},
+		{Title: "Nombre", Width: 26},
+		{Title: "Tipo", Width: 9},
+		{Title: "Dispositivo", Width: 13},
+		{Title: "Auto", Width: 5},
+		{Title: "", Width: 5},
 	}
 
 	s := table.DefaultStyles()
@@ -414,6 +521,7 @@ func buildConnTable(conns []network.Connection) table.Model {
 	)
 
 	var rows []table.Row
+	var keys []string
 	for _, c := range conns {
 		status := ""
 		if c.Active {
@@ -424,15 +532,16 @@ func buildConnTable(conns []network.Connection) table.Model {
 			auto = "✗"
 		}
 		rows = append(rows, table.Row{
-			truncateString(c.Name, 26),
+			cortarPorAnchoPlano(c.Name, 26),
 			connTypeIcon(c.Type),
-			c.Device,
+			cortarPorAnchoPlano(c.Device, 13),
 			auto,
 			status,
 		})
+		keys = append(keys, c.Name)
 	}
 	t.SetRows(rows)
-	return t
+	return t, keys
 }
 
 func connTypeIcon(t string) string {
