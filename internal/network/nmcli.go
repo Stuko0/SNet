@@ -1,18 +1,111 @@
 package network
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"strconv"
 	"strings"
+	"sync"
+	"syscall"
+	"time"
 )
 
-// runCmd ejecuta nmcli y devuelve stdout
-func runCmd(args ...string) (string, error) {
+// Timeouts por tipo de operación. Las consultas responden en menos de un
+// segundo en un sistema sano; las operaciones que activan red tardan más porque
+// esperan DHCP/802.1X/handshake. Antes no había ninguno: si nmcli se colgaba
+// (AP que no responde, servidor VPN caído), la TUI quedaba congelada para
+// siempre, porque Bubble Tea espera a que el comando termine.
+const (
+	timeoutQuery       = 10 * time.Second // lecturas: status, list, show
+	timeoutConnect     = 45 * time.Second // escaneo y conexión Wi-Fi
+	timeoutVPNActivate = 60 * time.Second // subir/bajar túneles
+	timeoutModify      = 20 * time.Second // cambios de config y borrados
+)
 
-	cmd := exec.Command("nmcli", args...)
+// timeoutFor deduce el timeout según los argumentos de nmcli: el verbo y el tipo
+// de objeto determinan cuánto puede tardar.
+//
+// SNeT_TEST_TIMEOUT_MS permite forzar un valor fijo. Se usa en los tests E2E
+// para no esperar 10s reales, y sirve para diagnosticar en un equipo lento.
+func timeoutFor(args []string) time.Duration {
+	if v := os.Getenv("SNet_TEST_TIMEOUT_MS"); v != "" {
+		if ms, err := strconv.Atoi(v); err == nil && ms > 0 {
+			return time.Duration(ms) * time.Millisecond
+		}
+	}
+
+	joined := strings.Join(args, " ")
+
+	switch {
+	// Activación de VPN: handshake contra un servidor remoto.
+	case strings.Contains(joined, "vpn-type") ||
+		(strings.Contains(joined, "connection up") && strings.Contains(joined, "vpn")):
+		return timeoutVPNActivate
+
+	// Wi-Fi: escaneo + asociación + DHCP + EAP.
+	case strings.Contains(joined, "wifi connect"), strings.Contains(joined, "wifi list"):
+		return timeoutConnect
+
+	// Modificaciones de perfil y activación de conexiones.
+	case strings.Contains(joined, "connection add"),
+		strings.Contains(joined, "connection modify"),
+		strings.Contains(joined, "connection delete"),
+		strings.Contains(joined, "connection up"),
+		strings.Contains(joined, "connection down"),
+		strings.Contains(joined, "device disconnect"),
+		strings.Contains(joined, "radio wifi"):
+		return timeoutModify
+	}
+
+	return timeoutQuery
+}
+
+// runCmd ejecuta nmcli con un timeout y devuelve stdout.
+//
+// El timeout se deduce de los argumentos (ver timeoutFor). Si nmcli no responde
+// a tiempo se mata el proceso y se devuelve un error tipado, para que la UI
+// pueda explicar qué pasó en vez de quedarse cargando indefinidamente.
+func runCmd(args ...string) (string, error) {
+	return runCmdTimeout(timeoutFor(args), args...)
+}
+
+// runCmdTimeout permite forzar un timeout explícito (usado en los tests).
+func runCmdTimeout(timeout time.Duration, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "nmcli", args...)
 	cmd.Env = append(cmd.Environ(), "LC_ALL=C")
+	// nmcli es un binario real (no un script), pero si algo lo envuelve —un
+	// wrapper, un sandbox, o el fake de los tests— matar sólo al padre deja
+	// huérfanos los hijos. Poner al proceso en su propio grupo y matar el grupo
+	// entero evita que queden `sleep`/`dhclient` colgados.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return nil
+		}
+		// Negativo = todo el grupo de procesos.
+		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
+			return cmd.Process.Kill()
+		}
+		return nil
+	}
+	// Tope duro: si el kill del grupo no alcanza, no esperar indefinidamente.
+	cmd.WaitDelay = 2 * time.Second
+
 	out, err := cmd.Output()
 	if err != nil {
+		// Distinguir el deadline agotado del fallo normal de nmcli.
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", &NmcliError{
+				Args:    args,
+				Timeout: timeout,
+				Stderr:  fmt.Sprintf("nmcli no respondió en %s (timeout)", timeout),
+			}
+		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return "", &NmcliError{Args: args, ExitCode: exitErr.ExitCode(), Stderr: string(exitErr.Stderr)}
 		}
@@ -26,10 +119,38 @@ type NmcliError struct {
 	Args     []string
 	ExitCode int
 	Stderr   string
+	// Timeout queda en 0 salvo que el comando se haya agotado.
+	Timeout time.Duration
 }
 
+// IsTimeout informa si el error fue por agotamiento del deadline.
+func (e *NmcliError) IsTimeout() bool { return e.Timeout > 0 }
+
+// Error devuelve el mensaje para el usuario, en español y sin secretos.
+//
+// Antes concatenaba TODOS los argumentos, así que una operación con contraseña
+// (`device wifi connect Casa password hunter2`) imprimía el secreto en pantalla.
+// Ahora delega en userMessage, que no expone argumentos.
 func (e *NmcliError) Error() string {
-	return "nmcli " + strings.Join(e.Args, " ") + ": " + e.Stderr
+	if msg := userMessage(e); msg != "" {
+		return msg
+	}
+	return "nmcli: " + sanitizeStderr(e.Stderr)
+}
+
+// Debug devuelve el comando completo (con secretos redactados) para logs.
+func (e *NmcliError) Debug() string {
+	var b strings.Builder
+	b.WriteString("nmcli ")
+	b.WriteString(redactArgs(e.Args))
+	if e.ExitCode != 0 {
+		fmt.Fprintf(&b, " (exit %d)", e.ExitCode)
+	}
+	if e.Stderr != "" {
+		b.WriteString(": ")
+		b.WriteString(sanitizeStderr(e.Stderr))
+	}
+	return b.String()
 }
 
 // GetGeneralStatus retorna el estado general de NetworkManager
@@ -73,7 +194,7 @@ func (c *NmcliClient) GetActiveConnection() (*NetworkState, error) {
 	}
 
 	for _, line := range strings.Split(out, "\n") {
-		parts := strings.Split(line, ":")
+		parts := splitTerse(line)
 		if len(parts) < 3 {
 			continue
 		}
@@ -120,7 +241,7 @@ func (c *NmcliClient) GetActiveConnection() (*NetworkState, error) {
 
 			signalOut, _ := runCmd("-t", "-f", "SSID,SIGNAL", "device", "wifi", "list", "--rescan", "no")
 			for _, line := range strings.Split(signalOut, "\n") {
-				parts := strings.Split(line, ":")
+				parts := splitTerse(line)
 				if len(parts) >= 2 && parts[0] == state.ActiveSSID {
 					fmt.Sscanf(parts[1], "%d", &state.SignalStrength)
 					break
@@ -153,7 +274,7 @@ func (c *NmcliClient) ScanWiFi(rescan bool) ([]WiFiNetwork, error) {
 	var networks []WiFiNetwork
 
 	for _, line := range lines {
-		parts := strings.Split(line, ":")
+		parts := splitTerse(line)
 		if len(parts) < 7 {
 			continue
 		}
@@ -187,7 +308,7 @@ func getKnownSSIDs() map[string]bool {
 	}
 	result := make(map[string]bool)
 	for _, line := range strings.Split(out, "\n") {
-		parts := strings.Split(line, ":")
+		parts := splitTerse(line)
 		if len(parts) >= 2 && parts[1] == "wifi" {
 			result[parts[0]] = true
 		}
@@ -206,7 +327,7 @@ func (c *NmcliClient) GetConnections() ([]Connection, error) {
 
 	var conns []Connection
 	for _, line := range strings.Split(out, "\n") {
-		parts := strings.Split(line, ":")
+		parts := splitTerse(line)
 		if len(parts) < 5 {
 			continue
 		}
@@ -247,7 +368,7 @@ func (c *NmcliClient) GetVPNs() ([]VPNConnection, error) {
 
 	var vpns []VPNConnection
 	for _, line := range strings.Split(out, "\n") {
-		parts := strings.Split(line, ":")
+		parts := splitTerse(line)
 		if len(parts) < 5 {
 			continue
 		}
@@ -297,7 +418,42 @@ func (c *NmcliClient) DeleteConnection(name string) error {
 }
 
 // DefaultClient is the package-level client used by convenience functions.
-var DefaultClient = &NmcliClient{}
+//
+// Es swappable para poder testear las vistas sin nmcli real (ver SetClient).
+var DefaultClient Client = &NmcliClient{}
+
+var clientMu sync.RWMutex
+
+// SetClient reemplaza el cliente usado por las funciones del paquete. Devuelve
+// una función para restaurar el anterior, pensada para `defer` en los tests:
+//
+//	defer network.SetClient(mock)()
+func SetClient(c Client) func() {
+	clientMu.Lock()
+	anterior := DefaultClient
+	DefaultClient = c
+	clientMu.Unlock()
+
+	return func() {
+		clientMu.Lock()
+		DefaultClient = anterior
+		clientMu.Unlock()
+	}
+}
+
+// ResetClient vuelve al cliente real (nmcli).
+func ResetClient() {
+	clientMu.Lock()
+	DefaultClient = &NmcliClient{}
+	clientMu.Unlock()
+}
+
+// Cliente devuelve el cliente activo de forma segura para concurrencia.
+func Cliente() Client {
+	clientMu.RLock()
+	defer clientMu.RUnlock()
+	return DefaultClient
+}
 
 func GetGeneralStatus() string                    { return DefaultClient.GetGeneralStatus() }
 func GetConnectivity() ConnectivityStatus         { return DefaultClient.GetConnectivity() }

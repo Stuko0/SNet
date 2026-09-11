@@ -110,7 +110,7 @@ func (c *NmcliClient) GetHotspotIface() string {
 		return ""
 	}
 	for _, line := range strings.Split(out, "\n") {
-		parts := strings.Split(line, ":")
+		parts := splitTerse(line)
 		if len(parts) >= 2 && parts[1] == "wifi" {
 			return parts[0]
 		}
@@ -139,14 +139,14 @@ func (c *NmcliClient) getActiveHotspotName() string {
 		return ""
 	}
 	for _, line := range strings.Split(out, "\n") {
-		parts := strings.Split(line, ":")
+		parts := splitTerse(line)
 		if len(parts) >= 3 && parts[2] == "ap" {
 			return parts[0]
 		}
 	}
 
 	for _, line := range strings.Split(out, "\n") {
-		parts := strings.Split(line, ":")
+		parts := splitTerse(line)
 		if len(parts) >= 1 && strings.HasPrefix(parts[0], hotspotConnPrefix) {
 			return parts[0]
 		}
