@@ -61,7 +61,13 @@ func settingsToLoad(connType string) []string {
 	case "wireguard":
 		settings = append(settings, "connection.interface-name")
 	}
-	settings = append(settings, "ipv4.addresses", "ipv4.gateway", "ipv4.dns", "connection.autoconnect")
+	// Se incluye el método (auto/manual) además de los valores: sin él no se
+	// puede distinguir "sin IP fija" de "IP pendiente de cargar".
+	settings = append(settings,
+		"ipv4.method", "ipv4.addresses", "ipv4.gateway", "ipv4.dns",
+		"ipv6.method", "ipv6.addresses", "ipv6.gateway", "ipv6.dns",
+		"ipv4.routes", "connection.autoconnect",
+	)
 	return settings
 }
 
@@ -195,6 +201,30 @@ func buildFields(connType string) []Field {
 			Setting: "ipv4.dns",
 			Input:   newInput("DNS (ej: 1.1.1.1,8.8.8.8)", false),
 		},
+		// IPv6: sin esto no se podía configurar una red v6, que es la brecha
+		// que separa un gestor "útil" de uno "completo".
+		Field{
+			Label:   "IPv6 (manual)",
+			Setting: "ipv6.addresses",
+			Input:   newInput("IPv6/Máscara (ej: 2001:db8::5/64)", false),
+		},
+		Field{
+			Label:   "IPv6 Gateway",
+			Setting: "ipv6.gateway",
+			Input:   newInput("Gateway v6 (ej: fe80::1)", false),
+		},
+		Field{
+			Label:   "IPv6 DNS",
+			Setting: "ipv6.dns",
+			Input:   newInput("DNS v6 (ej: 2606:4700:4700::1111)", false),
+		},
+		Field{
+			// "Rutas" y no "Rutas estáticas": LabelStyle mide 14 columnas y un
+			// label más largo se parte en dos líneas, descuadrando el form.
+			Label:   "Rutas",
+			Setting: "ipv4.routes",
+			Input:   newInput("Rutas (ej: 10.0.0.0/8 192.168.1.254)", false),
+		},
 		Field{
 			Label:   "Autoconnect",
 			Setting: "connection.autoconnect",
@@ -281,7 +311,38 @@ type editorSaveMsg struct {
 	err error
 }
 
+// saveConnection aplica los campos del formulario a la conexión.
+//
+// Los campos se guardan uno por uno, pero algunos dependen de otro: nmcli
+// rechaza `ipv6.addresses` si el método sigue en `auto`, y lo mismo con IPv4.
+// Por eso primero se resuelven los métodos y después el resto.
 func saveConnection(name string, fields []Field) tea.Msg {
+	// Índice por setting para poder consultar dependencias.
+	valores := make(map[string]string, len(fields))
+	for _, f := range fields {
+		valores[f.Setting] = f.Input.Value()
+	}
+
+	// Si hay direcciones IPv4/IPv6 manuales, el método debe ser `manual`
+	// (si no nmcli falla), y si se limpian vuelve a `auto`.
+	dependencias := []struct {
+		addrs  string
+		metodo string
+	}{
+		{"ipv4.addresses", "ipv4.method"},
+		{"ipv6.addresses", "ipv6.method"},
+	}
+
+	for _, d := range dependencias {
+		if valores[d.addrs] == "" {
+			continue
+		}
+		method := "manual"
+		if err := network.ModifyConnection(name, d.metodo, method); err != nil {
+			return editorSaveMsg{err: err}
+		}
+	}
+
 	for _, f := range fields {
 		val := f.Input.Value()
 		if val == "" {
@@ -292,8 +353,7 @@ func saveConnection(name string, fields []Field) tea.Msg {
 		if setting == "vpn.secrets" {
 			val = "password=" + val
 		}
-		err := network.ModifyConnection(name, setting, val)
-		if err != nil {
+		if err := network.ModifyConnection(name, setting, val); err != nil {
 			return editorSaveMsg{err: err}
 		}
 	}
@@ -316,11 +376,13 @@ func (m EditorModel) Update(msg tea.Msg) (EditorModel, tea.Cmd) {
 	case editorSaveMsg:
 		if msg.err != nil {
 			m.state = editorError
-			m.toast = "Error al guardar: " + msg.err.Error()
+			m.toast = "Error al guardar: " + msgError(msg.err)
 			m.toastErr = msg.err
 		} else {
 			m.state = editorDone
-			m.toast = "✓ Cambios guardados en " + m.connName
+			// Sin el "✓": renderToast/View ya anteponen el icono según el
+			// resultado, y si no quedaba duplicado ("✓ ✓ Cambios guardados").
+			m.toast = "Cambios guardados en " + m.connName
 			m.toastErr = nil
 		}
 		return m, nil

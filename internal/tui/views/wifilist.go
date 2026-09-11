@@ -93,7 +93,7 @@ func (m WifiListModel) Update(msg tea.Msg) (WifiListModel, tea.Cmd) {
 		if msg.err != nil {
 			m.err = msg.err
 			m.state = wifiError
-			m.toast = "Error al escanear: " + msg.err.Error()
+			m.toast = "Error al escanear: " + msgError(msg.err)
 			break
 		}
 		m.networks = msg.networks
@@ -105,7 +105,7 @@ func (m WifiListModel) Update(msg tea.Msg) (WifiListModel, tea.Cmd) {
 	case connectResultMsg:
 		m.state = wifiDone
 		if msg.err != nil {
-			m.toast = fmt.Sprintf("✗ Error al conectar a %s: %s", msg.ssid, msg.err.Error())
+			m.toast = fmt.Sprintf("Error al conectar a %s: %s", msg.ssid, msgError(msg.err))
 			m.toastErr = msg.err
 		} else {
 			m.toast = fmt.Sprintf("✓ Conectado a %s", msg.ssid)

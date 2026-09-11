@@ -41,6 +41,10 @@ type SavedModel struct {
 	// feedback del panel de contraseña (copiar al portapapeles)
 	pwdMsg    string
 	pwdMsgErr bool
+
+	// búsqueda y orden: con 34 conexiones la lista era inmanejable sin filtrar.
+	filtro filtroLista
+	orden  ordenLista
 }
 
 func NewSaved() SavedModel {
@@ -50,6 +54,7 @@ func NewSaved() SavedModel {
 	return SavedModel{
 		state:   savedLoading,
 		spinner: s,
+		filtro:  nuevoFiltro("Buscar conexión..."),
 	}
 }
 
@@ -99,12 +104,14 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 		m.state = savedIdle
 		if msg.err != nil {
 			m.err = msg.err
-			m.toast = "Error: " + msg.err.Error()
+			m.toast = msgError(msg.err)
 			m.state = savedError
 			break
 		}
 		m.conns = msg.conns
-		m.table, m.keyByRow = buildConnTable(msg.conns)
+		// Se reaplica el filtro/orden vigente para que refrescar no pierda la
+		// búsqueda que el usuario tenía activa.
+		m = m.rebuildTable()
 		m.err = nil
 		return m, nil
 
@@ -113,7 +120,7 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 		case "connect":
 			m.state = savedDone
 			if msg.err != nil {
-				m.toast = fmt.Sprintf("✗ Error al conectar %s: %s", msg.name, msg.err.Error())
+				m.toast = fmt.Sprintf("Error al conectar %s: %s", msg.name, msgError(msg.err))
 				m.toastErr = msg.err
 			} else {
 				m.toast = fmt.Sprintf("✓ Conectado a %s", msg.name)
@@ -124,7 +131,7 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 		case "delete":
 			m.state = savedDone
 			if msg.err != nil {
-				m.toast = fmt.Sprintf("✗ Error al eliminar %s: %s", msg.name, msg.err.Error())
+				m.toast = fmt.Sprintf("Error al eliminar %s: %s", msg.name, msgError(msg.err))
 				m.toastErr = msg.err
 			} else {
 				m.toast = fmt.Sprintf("✓ Eliminada: %s", msg.name)
@@ -135,7 +142,7 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 		case "password":
 			m.state = savedShowingPwd
 			if msg.err != nil {
-				m.toast = msg.err.Error()
+				m.toast = msgError(msg.err)
 				m.toastErr = msg.err
 				m.password = ""
 				return m, nil
@@ -195,6 +202,49 @@ func (m SavedModel) Update(msg tea.Msg) (SavedModel, tea.Cmd) {
 	return m, nil
 }
 
+// handleFiltroKey procesa el teclado mientras el buscador está abierto.
+//
+// Enter y Esc cierran el buscador conservando/limpiando el filtro: mantener el
+// filtro al cerrar permite navegar y conectar sobre los resultados filtrados.
+func (m SavedModel) handleFiltroKey(msg tea.KeyMsg) (SavedModel, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		// Cerrar el input pero conservar el filtro aplicado.
+		m.filtro.activo = false
+		m.filtro.input.Blur()
+		m = m.rebuildTable()
+		return m, nil
+
+	case "esc":
+		// Cancelar y limpiar el filtro.
+		m.filtro.cerrar()
+		m = m.rebuildTable()
+		return m, nil
+
+	case "ctrl+c":
+		return m, nil
+
+	case "up":
+		m.table.MoveUp(1)
+		return m, nil
+
+	case "down":
+		m.table.MoveDown(1)
+		return m, nil
+
+	default:
+		// Escribir re-filtra en vivo: con listas largas conviene ver el
+		// resultado mientras se tipea.
+		antes := m.filtro.consulta()
+		var cmd tea.Cmd
+		m.filtro.input, cmd = m.filtro.input.Update(msg)
+		if m.filtro.consulta() != antes {
+			m = m.rebuildTable()
+		}
+		return m, cmd
+	}
+}
+
 func (m SavedModel) handleDeleteConfirm(msg tea.KeyMsg) (SavedModel, tea.Cmd) {
 	switch msg.String() {
 	case "enter", "y":
@@ -212,9 +262,23 @@ func (m SavedModel) handleDeleteConfirm(msg tea.KeyMsg) (SavedModel, tea.Cmd) {
 }
 
 func (m SavedModel) handleIdleKey(msg tea.KeyMsg) (SavedModel, tea.Cmd) {
+	// Con el buscador abierto, todo el teclado va al input (incluidas las
+	// letras que en idle son atajos, como d/e/p/r).
+	if m.filtro.activo {
+		return m.handleFiltroKey(msg)
+	}
+
 	sel := m.getSelectedName()
 
 	switch msg.String() {
+	case "/":
+		m.filtro.abrir()
+		return m, nil
+
+	case "s":
+		m.orden = m.orden.siguiente()
+		m = m.rebuildTable()
+		return m, nil
 	case "enter":
 		if sel == "" {
 			return m, nil
@@ -262,6 +326,15 @@ func (m SavedModel) handleIdleKey(msg tea.KeyMsg) (SavedModel, tea.Cmd) {
 		m.table.MoveDown(1)
 		return m, nil
 
+	case "esc":
+		// Esc limpia un filtro que quedó aplicado tras cerrar el buscador con
+		// Enter; si no hay filtro, no hace nada (no debe cerrar la app).
+		if !m.filtro.vacio() {
+			m.filtro.cerrar()
+			m = m.rebuildTable()
+		}
+		return m, nil
+
 	default:
 		var cmd tea.Cmd
 		m.table, cmd = m.table.Update(msg)
@@ -276,6 +349,44 @@ func (m SavedModel) getSelectedName() string {
 	}
 	return m.keyByRow[idx]
 }
+
+// rebuildTable reaplica filtro y orden sobre las conexiones cargadas.
+// Se llama tras cada cambio de filtro/orden, no en cada tecla de escritura de
+// la tabla (eso reconstruía el modelo y perdía la selección).
+func (m SavedModel) rebuildTable() SavedModel {
+	visibles := filtrarYOrdenar(
+		m.conns,
+		m.filtro,
+		m.orden,
+		func(c network.Connection) []string { return []string{c.Name, c.Type, c.Device} },
+		compararConexiones,
+	)
+	m.table, m.keyByRow = buildConnTable(visibles)
+	return m
+}
+
+// compararConexiones ordena según el criterio activo.
+func compararConexiones(a, b network.Connection, orden ordenLista) bool {
+	switch orden {
+	case ordenNombre:
+		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
+	case ordenTipo:
+		if a.Type != b.Type {
+			return a.Type < b.Type
+		}
+		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
+	case ordenEstado:
+		// Activas primero; dentro de cada grupo, por nombre.
+		if a.Active != b.Active {
+			return a.Active
+		}
+		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
+	}
+	return false
+}
+
+// conexionesVisibles es la cantidad de filas tras filtrar.
+func (m SavedModel) conexionesVisibles() int { return len(m.keyByRow) }
 
 func (m SavedModel) getSelectedType() string {
 	selName := m.getSelectedName()
@@ -408,7 +519,23 @@ func (m SavedModel) renderPasswordBox() string {
 
 func (m SavedModel) renderTableView() string {
 	title := theme.CardTitleStyle.Render("󰆓 Conexiones Guardadas")
-	stats := fmt.Sprintf("  %d conexiones    ", len(m.conns))
+
+	// El contador refleja el filtro activo y el criterio de orden.
+	stats := fmt.Sprintf("  %d conexiones", len(m.conns))
+	if !m.filtro.vacio() {
+		stats += fmt.Sprintf(" · %d de %d", m.conexionesVisibles(), len(m.conns))
+	}
+	// El orden se muestra aparte para no pegarlo al conteo ("34 conexionesorden").
+	if ind := indicadorOrden(m.orden); ind != "" {
+		stats += " · " + ind
+	}
+	stats += "    "
+
+	// Buscador abierto: se muestra el input debajo del título.
+	var buscador string
+	if m.filtro.activo {
+		buscador = "\n  " + theme.CardTitleStyle.Render("Buscar: ") + m.filtro.input.View()
+	}
 
 	var body string
 	if len(m.conns) == 0 {
@@ -420,11 +547,21 @@ func (m SavedModel) renderTableView() string {
 			theme.OutputHintStyle.Render("Presiona 'r' para refrescar")
 		body = "\n" + theme.TableStyle.Render(
 			lipgloss.Place(savedTableWidth, 3, lipgloss.Center, lipgloss.Center, mensaje))
+	} else if m.conexionesVisibles() == 0 {
+		// Hay conexiones pero ninguna coincide: no confundir con "no hay nada".
+		mensaje := lipgloss.NewStyle().Foreground(theme.ColorWarning).
+			Render("Ninguna conexión coincide con la búsqueda") + "\n" +
+			theme.OutputHintStyle.Render("Esc para limpiar el filtro")
+		body = "\n" + theme.TableStyle.Render(
+			lipgloss.Place(savedTableWidth, 3, lipgloss.Center, lipgloss.Center, mensaje))
 	} else {
 		body = "\n" + theme.TableStyle.Render(m.table.View())
 	}
 
-	helpText := "  ↑/↓: Navegar  Enter: Conectar  e: Editar  d: Eliminar  p: Ver contraseña  r: Refrescar  ?: Ayuda"
+	helpText := "  ↑/↓: Navegar  Enter: Conectar  /: Buscar  s: Ordenar  e: Editar  d: Eliminar  p: Contraseña  r: Refrescar"
+	if m.filtro.activo {
+		helpText = "  Escribí para filtrar   Enter: Mantener filtro   Esc: Limpiar   ↑/↓: Navegar"
+	}
 	if m.state == savedShowingPwd {
 		helpText = "  ↑/↓: Navegar  p: Ver contraseña  c: Copiar  Esc: Cerrar el panel"
 	}
@@ -438,11 +575,19 @@ func (m SavedModel) renderTableView() string {
 	help := theme.OutputHintStyle.Render(wrapTexto(helpText, savedCardWidth-6))
 
 	return savedCard(
-		title + "\n" +
+		title + buscador + "\n" +
 			stats + "\n" +
 			body + "\n" +
 			help,
 	)
+}
+
+// indicadorOrden describe el criterio activo sólo cuando no es el natural.
+func indicadorOrden(o ordenLista) string {
+	if o == ordenNatural {
+		return ""
+	}
+	return "orden: " + o.String()
 }
 
 func (m SavedModel) renderDeleteConfirm() string {

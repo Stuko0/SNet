@@ -138,7 +138,7 @@ func (m VPNListModel) Update(msg tea.Msg) (VPNListModel, tea.Cmd) {
 		m.state = vpnIdle
 		if msg.err != nil {
 			m.err = msg.err
-			m.toast = "Error: " + msg.err.Error()
+			m.toast = msgError(msg.err)
 			m.state = vpnError
 			break
 		}
@@ -150,7 +150,7 @@ func (m VPNListModel) Update(msg tea.Msg) (VPNListModel, tea.Cmd) {
 	case vpnActionMsg:
 		m.state = vpnDone
 		if msg.err != nil {
-			m.toast = "✗ Error: " + msg.err.Error()
+			m.toast = msgError(msg.err)
 			m.toastErr = msg.err
 		} else {
 			switch msg.action {

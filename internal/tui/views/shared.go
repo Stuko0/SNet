@@ -3,6 +3,7 @@ package views
 import (
 	"strings"
 
+	"github.com/Stuko0/SNet/internal/network"
 	"github.com/Stuko0/SNet/internal/tui/theme"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
@@ -54,6 +55,27 @@ func cortarPorAnchoPlano(s string, max int) string {
 		return "…"
 	}
 	return string(r[:max-1]) + "…"
+}
+
+// msgError traduce un error del backend a un mensaje para el usuario.
+//
+// La capa network ya devuelve mensajes en español y sin secretos; este wrapper
+// existe para que las vistas tengan un único punto de entrada y no haya que
+// recordar importar network en cada una.
+func msgError(err error) string {
+	if err == nil {
+		return ""
+	}
+	return network.UserMessage(err)
+}
+
+// datosError devuelve true si hubo un timeout, para poder ofrecer "reintentar"
+// en vez de un error genérico.
+func esTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	return network.UserMessage(err) == network.MsgTimeout
 }
 
 // nuevaFilaInput arma una fila de formulario con cursor, label alineado a la

@@ -124,7 +124,7 @@ func (m HotspotModel) Update(msg tea.Msg) (HotspotModel, tea.Cmd) {
 		if msg.err != nil {
 			m.state = hotspotError
 			m.toastErr = msg.err
-			m.toast = fmt.Sprintf("✗ Error: %s", msg.err.Error())
+			m.toast = msgError(msg.err)
 		} else {
 			m.state = hotspotDone
 			m.toastErr = nil
